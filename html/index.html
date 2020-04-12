@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Coronavirus (COVID-19) Dashboard</title>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"/>
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.10.20/css/jquery.dataTables.min.css"/>
+  <link rel="stylesheet" href="custom.css"/>
+  <link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+  <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.3/Chart.bundle.min.js"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+  <script src="https://cdn.datatables.net/1.10.20/js/jquery.dataTables.min.js"></script>
+  <!--
+  <script src="/lib/js/querystring.js"></script>
+  -->
+  <script src="covid19.js"></script>
+</head>
+<body>
+
+<div class="container">
+<div class="row"><div class="col-sm-12">
+    <h1>Coronavirus Dashboard
+    <a data-toggle="modal" href="#info-window"><span class="glyphicon glyphicon-info-sign" aria-hidden="true"></span></a>
+    </h1>
+</div></div>
+
+<div class="row">
+<div class="col-xs-6">
+<p class="timestamp">Last Updated: <span id="updated"></span></p>
+</div>
+<div class="col-xs-6">
+<p class="timestamp">New cases/deaths are for <span id="newdate"></span></p>
+</div>
+</div>
+
+<div class="row"><div class="col-sm-12">
+<h3 class="summary">US Summary</h3>
+</div></div>
+
+<div class="row">
+<div class="col-xs-6">
+<div class="covid-banner" id="banner-cases">
+    <table>
+    <tr><td>Total Cases:</td><td class="total">123,456</td></tr>
+    <tr><td>New Cases:</td><td class="new">1,456</td></tr>
+    <tr><td>Last 7 Days:</td><td class="week">23,456</td></tr>
+    </table>
+</div>
+</div>
+<div class="col-xs-6">
+<div class="covid-banner" id="banner-deaths">
+    <table>
+    <tr><td>Total Deaths:</td><td class="total">123,456</td></tr>
+    <tr><td>New Deaths:</td><td class="new">1,456</td></tr>
+    <tr><td>Last 7 Days:</td><td class="week">23,456</td></tr>
+    </table>
+</div>
+</div>
+</div>
+
+<div class="row"><div class="col-sm-12">
+<ul class="nav nav-tabs">
+<li class="active"><a data-toggle="tab" data-index=0 href="#chart1-tab">Today</a></li>
+<li><a data-toggle="tab" data-index=1 href="#chart2-tab">Time Series</a></li>
+<li><a data-toggle="tab" data-index=2 href="#chart3-tab">State Detail</a></li>
+</ul>
+</div></div>
+
+<div class="row">
+</div>
+<div class="tab-content">
+  <div id="chart1-tab" class="tab-pane active">
+      <div class="row">
+        <div class="col-sm-12">
+
+        <div class="chart-wrapper">
+        <h3>Confirmed Cases</h3>
+        <canvas id="chart1"></canvas>
+        <form>
+          <div class="form-check inline">
+            <input type="checkbox" class="form-check-input" data-offset="0" id="ch1-percapita"/>
+            <label class="form-check-label" for="ch1-percapita">Per Capita</label>
+          </div>
+          <div class="form-check inline">
+            <input type="checkbox" class="form-check-input" data-offset="0" id="ch1-logscale"/>
+            <label class="form-check-label" for="ch1-logscale">Logarithmic Scale</label>
+          </div>
+        </form>
+        </div>
+
+        <div class="chart-wrapper">
+        <h3>Deaths</h3>
+        <canvas id="chart2"></canvas>
+        <form>
+          <div class="form-check inline">
+            <input type="checkbox" class="form-check-input" data-offset="1" id="ch2-percapita"/>
+            <label class="form-check-label" for="ch2-percapita">Per Capita</label>
+          </div>
+          <div class="form-check inline">
+            <input type="checkbox" class="form-check-input" data-offset="1" id="ch2-logscale"/>
+            <label class="form-check-label" for="ch2-logscale">Logarithmic Scale</label>
+          </div>
+        </form>
+        </div>
+
+        <div class="chart-wrapper">
+        <h3>Case Growth</h3>
+        <canvas id="chart6"></canvas>
+        </div>
+
+        <div class="chart-wrapper">
+        <h3>Case Fatality Rate (CFR)</h3>
+        <canvas id="chart3"></canvas>
+        </div>
+
+        </div>
+      </div>
+  </div>
+
+  <div id="chart2-tab" class="tab-pane">
+      <form>
+      <div class='checkbox-wrapper'>
+      <div class="row" id="ts-checkboxes">
+          <div class="col-xs-2"></div>
+          <div class="col-xs-2"></div>
+          <div class="col-xs-2"></div>
+          <div class="col-xs-2"></div>
+          <div class="col-xs-2"></div>
+          <div class="col-xs-2"></div>
+      </div>
+      </div>
+      </form>
+
+      <div class="row">
+        <div class="col-sm-12">
+        <div class="chart-wrapper">
+        <h3>Confirmed Cases</h3>
+        <canvas id="chart4"></canvas>
+        <form>
+          <div class="form-check inline">
+            <input type="radio" class="form-check-input" name="ch4-switch" value="total" data-offset="3" id="ch4-switch-total" checked/>
+            <label class="form-check-label" for="ch4-switch-total">Total Cases</label>
+          </div>
+          <div class="form-check inline">
+            <input type="radio" class="form-check-input" name="ch4-switch" value="new" data-offset="3" id="ch4-switch-new"/>
+            <label class="form-check-label" for="ch4-switch-new">New Cases</label>
+          </div>
+          <div class="form-check inline">
+            <input type="checkbox" class="form-check-input" data-offset="3" id="ch4-percapita"/>
+            <label class="form-check-label" for="ch4-percapita">Per Capita</label>
+          </div>
+          <div class="form-check inline">
+            <input type="checkbox" class="form-check-input" data-offset="3" id="ch4-logscale"/>
+            <label class="form-check-label" for="ch4-logscale">Logarithmic Scale</label>
+          </div>
+        </form>
+        </div>
+
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-sm-12">
+        <div class="chart-wrapper">
+        <h3>Deaths</h3>
+        <canvas id="chart5"></canvas>
+        <form>
+          <div class="form-check inline">
+            <input type="radio" class="form-check-input" name="ch5-switch" value="total" data-offset="4" id="ch5-switch-total" checked/>
+            <label class="form-check-label" for="ch5-switch-total">Total Deaths</label>
+          </div>
+          <div class="form-check inline">
+            <input type="radio" class="form-check-input" name="ch5-switch" value="new" data-offset="4" id="ch5-switch-new"/>
+            <label class="form-check-label" for="ch5-switch-new">New Deaths</label>
+          </div>
+          <div class="form-check inline">
+            <input type="checkbox" class="form-check-input" data-offset="4" id="ch5-percapita"/>
+            <label class="form-check-label" for="ch5-percapita">Per Capita</label>
+          </div>
+          <div class="form-check inline">
+            <input type="checkbox" class="form-check-input" data-offset="4" id="ch5-logscale"/>
+            <label class="form-check-label" for="ch5-logscale">Logarithmic Scale</label>
+          </div>
+        </form>
+        </div>
+
+        </div>
+      </div>
+  </div>
+
+  <div id="chart3-tab" class="tab-pane">
+      <div class="row">
+        <div class="col-sm-12">
+        <form>
+        <select id="state-detail-select">
+        </select>
+        </form>
+        </div>
+      </div>
+
+      <div class="row">
+      <div class="col-xs-6">
+      <div class="covid-banner" id="banner-state-cases">
+          <table>
+          <tr><td>Total Cases:</td><td class="total">123,456</td></tr>
+          <tr><td>New Cases:</td><td class="new">1,456</td></tr>
+          <tr><td>Last 7 Days:</td><td class="week">23,456</td></tr>
+          </table>
+      </div>
+      </div>
+      <div class="col-xs-6">
+      <div class="covid-banner" id="banner-state-deaths">
+          <table>
+          <tr><td>Total Deaths:</td><td class="total">123,456</td></tr>
+          <tr><td>New Deaths:</td><td class="new">1,456</td></tr>
+          <tr><td>Last 7 Days:</td><td class="week">23,456</td></tr>
+          </table>
+      </div>
+      </div>
+      </div>
+
+      <div class="row"> <div class="col-sm-12">
+      <div class="chart-wrapper" style="display: none">
+          <canvas id="chart5"></canvas>
+      </div>
+      <table class="table table-striped" id="county-table">
+      <thead>
+          <tr>
+              <th>County</th>
+              <th>Total Cases</th>
+              <th>New Cases</th>
+              <th>Daily Growth (3&#8209;day&nbsp;avg)</th>
+              <th>Total Deaths</th>
+              <th>New Deaths</th>
+          </tr>
+      </thead>
+      <tbody>
+      </tbody>
+      </table>
+      </div></div>
+  </div>
+
+</div> <!-- .tab-content -->
+</div> <!-- .container -->
+
+<div class="modal fade" tabindex="-1" role="dialog" id="info-window" aria-labelledby="infoWindowLabel">
+  <div class="modal-dialog modal-lg" role="document">
+  <div class="modal-content">
+    <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 id="infoWindowLabel">Overview</h4>
+    </div>
+    <div class="modal-body">
+        <p>This is a simple dashboard for viewing what is likely the most important data series of 2020. Sorry, US data only for the moment.
+        If you're looking for global dashboards, try the excellent
+        <a href="https://www.arcgis.com/apps/opsdashboard/index.html#/bda7594740fd40299423467b48e9ecf6">Johns Hopkins Dashboard</a>
+        or the <a href="http://datatopics.worldbank.org/universal-heatlh-coverage/covid19/">World Bank's COVID-19 data page</a>.</p>
+        <p>Many thanks for the incredible teams of data crunchers around the world, particularly at Johns Hopkins, for working tirelessly
+        to get this data published, up to date, and <a href="https://opendefinition.org">open</a>.<p>
+
+        <p>And in case you're wondering, <a href="http://timherzog.net">this is me</a>.
+
+        <h5>Data Notes</h5>
+        <ul>
+        <li>Source: <a href="https://systems.jhu.edu/research/public-health/ncov/">Johns Hopkins University/Center for Systems Science and Engineering</a>
+        via <a href="https://github.com/CSSEGISandData/COVID-19">Github</a>.
+        </li>
+        <li>Case Fatality Rate (CFR) is defined as deaths/cases given the available data. These numbers are probably somewhat higher than the actual
+        CFR due to lack of testing, undiagnosed cases, asymptomatic infections, etc.
+        </li>
+        <li>In some instances, case data appears to decline over time, or new case data appears negative. That is because the reported case data actually
+        does decline relative to the previous day. I assume these are anomalies or perhaps changes in attribution,
+        but the dashboard plots data as they are reported without trying to make
+        any corrections. I do try to report data issues back to the source as I encounter them
+        (<a href="https://github.com/CSSEGISandData/COVID-19/issues">you can too</a>).</li>
+        </ul>
+    </div>
+  </div>
+  </div>
+</div>
+
+</body>
+</html>

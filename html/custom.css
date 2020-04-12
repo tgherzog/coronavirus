@@ -1,0 +1,127 @@
+
+h1 span.glyphicon {
+    font-size: 0.4em;
+    vertical-align: super;
+}
+
+.modal-body li {
+  margin-bottom: 0.5em;
+}
+
+.chart-wrapper {
+  margin: 6px 0;
+  
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.checkbox-wrapper {
+  margin: 10px 0 6px;
+  padding: 3px;
+  background: #eef;
+}
+
+div.form-check.inline {
+  display: inline-block;
+  margin: 0 0.75em;
+  width: auto;
+}
+
+label {
+  font-weight: normal;
+  font-size: 0.8em;
+  margin: 0 0 0 2px;;
+}
+
+.error, .stale {
+  color: red;
+}
+
+div.row.chart > div {
+  margin: 12px 20px;
+}
+
+div.covid-banner {
+  margin: 6px 4px 18px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  font-size: 1.25em;
+}
+
+div.covid-banner table {
+  margin: 0 auto;
+}
+div.covid-banner td {
+  padding: 2px 12px;
+  vertical-align: top;
+}
+
+div.covid-banner td:nth-child(2) {
+  text-align: right;
+  font-weight: bold;
+
+}
+
+#banner-cases {
+  background: rgba(255, 99, 132, 0.8);
+}
+
+#banner-deaths {
+  background: rgba(153, 102, 255, 0.8);
+}
+
+#banner-state-cases {
+  background: rgba(255, 159, 64, 0.8);
+}
+
+#banner-state-deaths {
+  background: rgba(54, 162, 235, 0.8);
+}
+
+h3.summary {
+  text-align: center;
+}
+
+p.timestamp span {
+  white-space: nowrap;
+}
+
+#state-detail-select {
+  font-size: 1.25em;
+  margin: 10px 0;
+}
+
+#county-table th, #county-table td {
+  text-align: right;
+}
+
+#county-table th:nth-child(1), #county-table td:nth-child(1) {
+  text-align: left;
+}
+
+.state-abbr {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .state-name {
+    display: none;
+  }
+  .state-abbr {
+    display: inline-block;
+  }
+}
+
+@media (max-width: 600px) {
+    div.covid-banner {
+      font-size: 1em;
+    }
+
+    div.covid-banner td {
+      padding: 2px;
+    }
+
+    #county-table {
+      font-size: 0.85em;
+    }
+}
