@@ -100,12 +100,12 @@ def get_basic_data(level):
     return pop.join(area).join(cen)
 
 
-def case_data(c, d):
+def case_data(c, d, **kwargs):
 
-    return {
-        'cases': list(map(lambda x: int(x), c)),
-        'deaths': list(map(lambda x: int(x), d))
-    }
+    ds = kwargs
+    ds['cases'] = list(map(lambda x: int(x), c))
+    ds['deaths'] = list(map(lambda x: int(x), d))
+    return ds
 
 def add_century(x):
 
@@ -142,7 +142,7 @@ data = {
   'new_cases': None,
   'new_deaths': None,
   'states': {},
-  'data': {}
+  'counties': {}
 }
 
 ndays_avg = 3 # number of days to average
@@ -157,10 +157,8 @@ data['deaths'] = int(deaths[today])
 data['new_cases'] = int(cases[today] - cases[yesterday])
 data['new_deaths'] = int(deaths[today] - deaths[yesterday])
 
-data['data']['USA'] = case_data(cases[date_columns], deaths[date_columns])
-
 # This is probably not the official national estimate, but for this purpose it's close enough
-data['states']['USA'] = {'code': 'USA', 'population': int(bg1['population'].sum())}
+data['states']['USA'] = case_data(cases[date_columns], deaths[date_columns], code='USA', population=int(bg1['population'].sum()))
 
 c2 = c.groupby('Province/State').sum()
 d2 = d.groupby('Province/State').sum()
@@ -168,8 +166,7 @@ d2 = d.groupby('Province/State').sum()
 for key,row in c2.iterrows():
     code = bg1['code'].get(key)
     if code:
-        data['states'][key] = {'code': code, 'population': int(bg1['population'].get(key))}
-        data['data'][key] = case_data(row[date_columns], d2.loc[key, date_columns])
+        data['states'][key] = case_data(row[date_columns], d2.loc[key, date_columns], code=code, population=int(bg1['population'].get(key)))
 
         counties = []
         for k,v in c[c['Province/State']==key].dropna(subset=['Admin2']).iterrows():
@@ -184,6 +181,12 @@ for key,row in c2.iterrows():
         with open(os.path.join(options['TARGET_DIR'], code + '.json'), 'w') as fd:
             json.dump(counties, fd)
 
+for key,row in c.sort_values(today, ascending=False).head(50).iterrows():
+    fips = row['FIPS']
+    code = bg1['code'].get(row['Province/State'])
+    addr = '{}/{}'.format(row['Admin2'], code)
+    data['counties'][addr] = case_data(row[date_columns], d.loc[key, date_columns], fips=fips, county=row['Admin2'], state=row['Province/State'], state_abbr=code, population=int(bg2['population'].get(fips)))
+    
 with open(os.path.join(options['TARGET_DIR'], 'USA.json'), 'w') as fd:
     json.dump(data, fd)
 
