@@ -8,9 +8,11 @@ h1 span.glyphicon {
   margin-bottom: 0.5em;
 }
 
-.chart-wrapper {
-  margin: 6px 0;
+.chart-wrapper, .dataTables_wrapper {
+  margin: 12px 0;
+}
   
+.chart-wrapper {
   user-select: none;
   -webkit-user-select: none;
 }
@@ -86,16 +88,16 @@ p.timestamp span {
   white-space: nowrap;
 }
 
-#state-detail-select {
+#state-detail-select, #today-select {
   font-size: 1.25em;
   margin: 10px 0;
 }
 
-#county-table th, #county-table td {
+table.table-cases th, table.table-cases td {
   text-align: right;
 }
 
-#county-table th:nth-child(1), #county-table td:nth-child(1) {
+table.table-cases th:nth-child(1), table.table-cases td:nth-child(1), table.table-cases.check-table th:nth-child(2), table.table-cases.check-table td:nth-child(2) {
   text-align: left;
 }
 
@@ -121,7 +123,21 @@ p.timestamp span {
       padding: 2px;
     }
 
-    #county-table {
+    table.table-cases {
       font-size: 0.85em;
     }
 }
+
+#state-table_wrapper .dt-buttons::before {
+  content: "Select: ";
+}
+
+button.dt-button {
+  padding: 1px 7px;
+  margin-bottom: 0;
+}
+
+tr.aggregate {
+  font-weight: bold;
+}
+
