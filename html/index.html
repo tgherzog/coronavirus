@@ -17,12 +17,12 @@
 </head>
 <body>
 
-<div class="modal fade" tabindex="-1" role="dialog" id="info-window" aria-labelledby="infoWindowLabel">
+<div class="modal fade" tabindex="-1" role="dialog" id="info-window" aria-labelledby="dashboard-info-title">
   <div class="modal-dialog modal-lg" role="document">
   <div class="modal-content">
     <div class="modal-header">
         <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-        <h4 id="infoWindowLabel">Overview</h4>
+        <h4 id="dashboard-info-title">Overview</h4>
     </div>
     <div class="modal-body">
         <p>This is a simple dashboard for viewing what is likely the most important data series of 2020. Sorry, US data only for the moment.
@@ -53,6 +53,29 @@
   </div>
 </div>
 
+<div class="modal fade" tabindex="-1" role="dialog" id="trend-info" aria-labelledby="trend-info-title">
+  <div class="modal-dialog modal-lg" role="document">
+  <div class="modal-content">
+    <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 id="trend-info-title">About Daily Trends</h4>
+    </div>
+    <div class="modal-body">
+        <p>Daily trends is an indicator of whether the new or daily cases/deaths rate is trending up or down over the most recent <span class="trendlen">0</span>-day period.
+        It's the same as the trend line (or regression line) that Excel draws on a line chart.</p>
+        <p>Positive numbers mean the rate of cases/deaths is still increasing. Negative numbers do <strong>not</strong>
+        mean that new cases/deaths have stopped; it means they are trending towards stopping, or towards zero.</p>
+        <p>The trend line is relevant because a downward trend may suggest that the country or a state/county may have reached the "peak" of the pandemic crisis. Furthermore,
+        the White House has identified the <a href="https://www.whitehouse.gov/openingamerica/#criteria">downward case trajectory over a 14-day period</a> as one of the
+        threshold criteria for a state proceeding towards a phased economic comeback.</p>
+        <p>The trend calculations here are <strong>not official estimates</strong>. They are my own current best guesses for what the case trends are showing, and I will probably
+        adjust them over time. It's not really clear from the information linked above what the official trends are or how they should be calculated. Any suggestions this
+        way are most welcomed via the <a href="https://twitter.com/tgherzog">Twitter</a> or the <a href="https://github.com/tgherzog/coronavirus/issues">Github</a>.</p>
+    </div>
+  </div>
+  </div>
+</div>
+
 <div class="container">
 <div class="row"><div class="col-sm-12">
     <h1>Coronavirus Dashboard
@@ -65,7 +88,8 @@
 <p class="timestamp">Last Updated: <span id="updated"></span></p>
 </div>
 <div class="col-xs-6">
-<p class="timestamp">New cases/deaths are for <span id="newdate"></span></p>
+<p class="timestamp">New cases/deaths are for <span id="newdate"></span>. Daily trends are calculated for the most recent <span class="trendlen">0</span> days
+(<a data-toggle="modal" href="#trend-info">more info</a>).</p>
 </div>
 </div>
 
@@ -79,7 +103,7 @@
     <table>
     <tr><td>Total Cases:</td><td class="total">123,456</td></tr>
     <tr><td>New Cases:</td><td class="new">1,456</td></tr>
-    <tr><td>Last 7 Days:</td><td class="week">23,456</td></tr>
+    <tr><td>Daily Trend: <a data-toggle="modal" href="#trend-info"><span class="glyphicon glyphicon-info-sign" aria-hidden="true"><span></a></td><td class="trend">23,456</td></tr>
     </table>
 </div>
 </div>
@@ -88,7 +112,7 @@
     <table>
     <tr><td>Total Deaths:</td><td class="total">123,456</td></tr>
     <tr><td>New Deaths:</td><td class="new">1,456</td></tr>
-    <tr><td>Last 7 Days:</td><td class="week">23,456</td></tr>
+    <tr><td>Daily Trend: <a data-toggle="modal" href="#trend-info"><span class="glyphicon glyphicon-info-sign" aria-hidden="true"><span></a></td><td class="trend">23,456</td></tr>
     </table>
 </div>
 </div>
@@ -114,7 +138,7 @@
                 <option value="new_cases">New Cases</option>
                 <option value="deaths">Total Deaths</option>
                 <option value="new_deaths">New Deaths</option>
-                <option value="avg_growth">Daily Growth (3-day avg)</option>
+                <option value="avg_growth">Daily Case Trend</option>
                 <option value="cfr">Case Fatality Rate</option>
                 </select>
                 </form>
@@ -201,7 +225,7 @@
                       <th>State</th>
                       <th>Total Cases</th>
                       <th>New Cases</th>
-                      <th>Daily Growth (3&#8209;day&nbsp;avg)</th>
+                      <th>Daily Case Trend</th>
                       <th>Total Deaths</th>
                       <th>New Deaths</th>
                   </tr>
@@ -230,7 +254,7 @@
                   <table>
                   <tr><td>Total Cases:</td><td class="total">123,456</td></tr>
                   <tr><td>New Cases:</td><td class="new">1,456</td></tr>
-                  <tr><td>Last 7 Days:</td><td class="week">23,456</td></tr>
+                  <tr><td>Daily Trend:</td><td class="trend">23,456</td></tr>
                   </table>
               </div>
           </div>
@@ -239,7 +263,7 @@
                   <table>
                   <tr><td>Total Deaths:</td><td class="total">123,456</td></tr>
                   <tr><td>New Deaths:</td><td class="new">1,456</td></tr>
-                  <tr><td>Last 7 Days:</td><td class="week">23,456</td></tr>
+                  <tr><td>Daily Trend:</td><td class="trend">23,456</td></tr>
                   </table>
               </div>
           </div>
@@ -253,7 +277,7 @@
                       <th>County</th>
                       <th>Total Cases</th>
                       <th>New Cases</th>
-                      <th>Daily Growth (3&#8209;day&nbsp;avg)</th>
+                      <th>Daily Case Trend</th>
                       <th>Total Deaths</th>
                       <th>New Deaths</th>
                   </tr>
@@ -334,7 +358,7 @@
                       <th>County/State</th>
                       <th>Total Cases</th>
                       <th>New Cases</th>
-                      <th>Daily Growth (3&#8209;day&nbsp;avg)</th>
+                      <th>Daily Case Trend</th>
                       <th>Total Deaths</th>
                       <th>New Deaths</th>
                   </tr>

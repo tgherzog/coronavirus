@@ -1,7 +1,12 @@
 
-h1 span.glyphicon {
-    font-size: 0.4em;
+span.glyphicon-info-sign {
+    font-size: 0.6em;
     vertical-align: super;
+    color: black;
+}
+
+h1 span.glyphicon-info-sign {
+    font-size: 0.4em;
 }
 
 .modal-body li {

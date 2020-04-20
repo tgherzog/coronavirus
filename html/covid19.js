@@ -26,6 +26,8 @@ moreChartColors = [
 "#5B4534", "#FDE8DC", "#404E55", "#0089A3", "#CB7E98", "#A4E804", "#324E72", "#6A3A4C",
 ];
 
+trendLen = 7; // also some static labels in the HTML that need to match any changes here
+
 panes = [false, false, false, false];
 formatters = {
     rank: function(items, data) {
@@ -61,13 +63,21 @@ formatters = {
         return state_name + ': ' + formatCaseValue(total, offset, 3);
     },
     label: function(item, data, offset) {
-      var label = data.datasets[item.datasetIndex].label || '';
-      if( offset == 4 && (config[4].settings.type == 'avg_growth' || config[4].settings.type == 'cfr') ) {
-        var value = (item.yLabel*100).toFixed(2) + '%';
+      var label = data.datasets[item.datasetIndex].label || '', value = undefined;
+      if( offset == 4 ) {
+        var type = config[4].settings.type;
+        if( type == 'cfr' ) {
+            value = (item.yLabel*100).toFixed(2) + '%';
+        }
+        else if( type == 'avg_growth' ) {
+            value = formatCaseValue(item.yLabel.toFixed(2), offset, 3);
+        }
       }
-      else {
-        var value = formatCaseValue(item.yLabel, offset, 3);
+
+      if( value == undefined ) {
+        value = formatCaseValue(item.yLabel, offset, 3);
       }
+
       return label + ': ' + value;
     },
     pct_label: function(item) {
@@ -82,6 +92,22 @@ formatters = {
 function capitalize(str) {
 
     return str[0].toUpperCase() + str.slice(1);
+}
+
+function slope(data) {
+
+  var yArray = data.slice(-trendLen-1);
+  var i, n = yArray.length-1;
+  var sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+
+  for(var i=0;i<n;i++) {
+    sumX += i;
+    sumY += yArray[i+1] - yArray[i];
+    sumXY += i * (yArray[i+1] - yArray[i]);
+    sumXX += i * i;
+  }
+
+  return (n*sumXY - sumX*sumY) / (n*sumXX - sumX*sumX);
 }
 
 function addCommas(value, plus=false) {
@@ -100,6 +126,7 @@ function formatCaseValue(value, idx, points=2) {
 }
 
 config = [
+  // state tab - cases line chart
   {
     type: 'line',
     data: {
@@ -142,6 +169,8 @@ config = [
     },
     chart_: null
   },
+
+  // state tab - deaths line chart
   {
     type: 'line',
     data: {
@@ -184,6 +213,8 @@ config = [
     },
     chart_: null
   },
+
+  // top counties tab - cases line chart
   {
     type: 'line',
     data: {
@@ -226,6 +257,8 @@ config = [
     },
     chart_: null
   },
+
+  // top counties tab - deaths line chart
   {
     type: 'line',
     data: {
@@ -268,6 +301,8 @@ config = [
     },
     chart_: null
   },
+
+  // combined chart chart on today tab
   {
     type: 'bar',
     data: {
@@ -298,7 +333,7 @@ config = [
               var type = config[4].settings.type;
               switch(type) {
                 case 'cfr':
-                case 'avg_growth':
+                // case 'avg_growth':
                     return formatters.pct_label(value);
               }
 
@@ -324,6 +359,8 @@ config = [
     },
     chart_: null
   },
+
+  // legacy from here down
   {
     type: 'bar',
     data: {
@@ -495,9 +532,9 @@ function updateTodayChart() {
                     label2 = label;
                     break;
                 case 'avg_growth':
-                    obs = Math.pow(cases[n] / cases[n-3], 1/3) - 1;
-                    label = 'Daily Growth (3-day avg.)';
-                    label2 = 'Daily Growth';
+                    obs = slope(cases);
+                    label = 'Daily Trend';
+                    label2 = label;
                     break;
                 case 'cfr':
                     obs = deaths[n] / cases[n];
@@ -602,11 +639,11 @@ function updateBadges(state, caseID, deathsID) {
 
     $(caseID).find('.total').text(addCommas(cases[n-1]));
     $(caseID).find('.new').text(addCommas(cases[n-1] - cases[n-2], true));
-    $(caseID).find('.week').text(addCommas(cases[n-1] - cases[n-8], true));
+    $(caseID).find('.trend').text(addCommas(slope(cases).toFixed(0), true));
 
     $(deathsID).find('.total').text(addCommas(deaths[n-1]));
     $(deathsID).find('.new').text(addCommas(deaths[n-1] - deaths[n-2], true));
-    $(deathsID).find('.week').text(addCommas(deaths[n-1] - deaths[n-8], true));
+    $(deathsID).find('.trend').text(addCommas(slope(deaths).toFixed(0), true));
 }
 
 function updateState(state) {
@@ -630,6 +667,10 @@ function initialize() {
     $.get(apiRoot + 'USA.json', function(data_) {
         data = data_;
 
+        qs = new Querystring();
+        trendLen = qs.get('trend', 14);
+        $('.trendlen').text(trendLen.toString());
+
         // ignore dates that have less than 25 cases, which just happens to be all of February
         data.dayOffset = 0;
         while( data.dayOffset < data['states']['USA']['cases'].length && data['states']['USA']['cases'][data.dayOffset] < 25 )
@@ -651,7 +692,7 @@ function initialize() {
             stats.deaths = deaths[n];
             stats.new_cases = stats.cases - cases[n-1];
             stats.new_deaths = stats.deaths - deaths[n-1];
-            stats.avg_growth = Math.pow(stats.cases / cases[n-3], 1/3) - 1;
+            stats.avg_growth = slope(cases).toFixed(2);
 
             var chk_name = 'chk-state-' + code;
             $chk = $('<input type="checkbox"/>').val(key).attr('name', chk_name).attr('id', chk_name).addClass('form-check-input');
@@ -686,9 +727,17 @@ function initialize() {
             config[1].chart_.update();
         });
 
-        case_list.sort(function(b, a) { return a.cases - b.cases });
-        for(i=0;i<5;i++) {
-            $('#chk-state-' + case_list[i].code).prop('checked', true);
+        if( (user_states = qs.get('states'))  ) {
+            user_states = user_states.split(',');
+            for(i=0;i<user_states.length;i++) {
+                $('#chk-state-' + user_states[i]).prop('checked', true);
+            }
+        }
+        else {
+            case_list.sort(function(b, a) { return a.cases - b.cases });
+            for(i=0;i<5;i++) {
+                $('#chk-state-' + case_list[i].code).prop('checked', true);
+            }
         }
 
         config[0].data.labels = config[1].data.labels = data['days'].slice(data.dayOffset);
@@ -724,7 +773,7 @@ function initialize() {
             stats.deaths = deaths[n];
             stats.new_cases = stats.cases - cases[n-1];
             stats.new_deaths = stats.deaths - deaths[n-1];
-            stats.avg_growth = Math.pow(stats.cases / cases[n-3], 1/3) - 1;
+            stats.avg_growth = slope(cases).toFixed(2);
 
             var chk_name = 'chk-topcounty-' + fips;
             $chk = $('<input type="checkbox"/>').val(key).attr('name', chk_name).attr('id', chk_name).addClass('form-check-input');
@@ -805,15 +854,11 @@ function tableParams(id, offset) {
             targets: 1
           },
           {
-            render: formatters.pct_label,
-            targets: 5
-          },
-          {
             render: function(data) {
                 return addCommas(data)
             }
             ,
-            targets: [3, 4, 6, 7]
+            targets: [3, 4, 5, 6, 7]
           }
       ]
     };
@@ -827,19 +872,20 @@ $(document).ready(function() {
 
     $('#county-table').DataTable({
       paging: false,
+      autoWidth: false,
       searching: true,
       info: false,
       order: [[ 1, 'desc' ]],
       columnDefs: [
           {
-            render: formatters.pct_label,
-            targets: 3
-          },
-          {
             render: function(data) {
                 return addCommas(data)
             },
-            targets: [1, 2, 4, 5]
+            targets: [1, 2, 3, 4, 5]
+          },
+          {
+            visible: false,
+            targets: 3
           }
       ]
     });
