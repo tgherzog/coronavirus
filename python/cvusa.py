@@ -185,7 +185,7 @@ for key,row in c.sort_values(today, ascending=False).head(50).iterrows():
     fips = row['FIPS']
     code = bg1['code'].get(row['Province/State'])
     addr = '{}/{}'.format(row['Admin2'], code)
-    data['counties'][addr] = case_data(row[date_columns], d.loc[key, date_columns], fips=fips, county=row['Admin2'], state=row['Province/State'], state_abbr=code, population=int(bg2['population'].get(fips)))
+    data['counties'][addr] = case_data(row[date_columns], d.loc[key, date_columns], fips=fips, county=row['Admin2'], state=row['Province/State'], state_abbr=code, population=safe_cast(bg2['population'].get(fips, 0)))
     
 with open(os.path.join(options['TARGET_DIR'], 'USA.json'), 'w') as fd:
     json.dump(data, fd)
