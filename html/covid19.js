@@ -113,7 +113,7 @@ function slope(data) {
 
 function addCommas(value, plus=false) {
 
-  prefix = (plus && value >= 0) ? '+' : '';
+  prefix = (plus && value > 0) ? '+' : '';
   return prefix + value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
