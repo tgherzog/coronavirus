@@ -55,8 +55,14 @@ def csse_refs(locale='global'):
         
     elif locale == 'usa':
         c_url, d_url = map(lambda x: 'csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_{}_US.csv'.format(x), ['confirmed', 'deaths'])
-        c = repo.get_contents(c_url)
-        d = repo.get_contents(d_url)
+
+        # we now need to get a list of file metadata for the parent directory and traverse it to find the object we need. Reason is that
+        # when the file size exceeds 1M get_contents will fail - see https://medium.com/@caludio/how-to-download-large-files-from-github-4863a2dbba3b
+        for elem in repo.get_contents('csse_covid_19_data/csse_covid_19_time_series'):
+            if elem.path == c_url:
+                c = elem
+            elif elem.path == d_url:
+                d = elem
         
         c_path, d_path, r_path = c.download_url, d.download_url, None
 
