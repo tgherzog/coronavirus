@@ -157,7 +157,7 @@ data['deaths'] = int(deaths[today])
 data['new_cases'] = int(cases[today] - cases[yesterday])
 data['new_deaths'] = int(deaths[today] - deaths[yesterday])
 
-# This is probably not the official national estimate, but for this purpose it's close enough
+# This is probably not the official national population estimate, but for this purpose it's close enough
 data['states']['USA'] = case_data(cases[date_columns], deaths[date_columns], code='USA', population=int(bg1['population'].sum()))
 
 c2 = c.groupby('Province/State').sum()
@@ -167,19 +167,6 @@ for key,row in c2.iterrows():
     code = bg1['code'].get(key)
     if code:
         data['states'][key] = case_data(row[date_columns], d2.loc[key, date_columns], code=code, population=int(bg1['population'].get(key)))
-
-        counties = []
-        for k,v in c[c['Province/State']==key].dropna(subset=['Admin2']).iterrows():
-            if c.loc[k, avg_start] > 0:
-                avg = round(pow(c.loc[k, today] / c.loc[k, avg_start], 1/3) - 1, 6)
-            else:
-                avg = 0;
-
-            counties.append({'name': v['Admin2'], 'cases': int(v[today]), 'deaths': int(d.loc[k, today]),
-              'new_cases': int(v[today]-v[yesterday]), 'new_deaths': int(d.loc[k, today] - d.loc[k, yesterday]), 'avg_growth': avg})
-
-        with open(os.path.join(options['TARGET_DIR'], code + '.json'), 'w') as fd:
-            json.dump(counties, fd)
 
 for key,row in c.sort_values(today, ascending=False).head(50).iterrows():
     fips = row['FIPS']
@@ -198,3 +185,26 @@ for key,row in c.sort_values(today, ascending=False).head(50).iterrows():
 with open(os.path.join(options['TARGET_DIR'], 'USA.json'), 'w') as fd:
     json.dump(data, fd)
 
+for key,row in c2.iterrows():
+    code = bg1['code'].get(key)
+    if code:
+        state_data = {
+          'state': key,
+          'state_abbr': code,
+          'most_recent_day': date_columns_with_century[-1],
+          'days': date_columns_with_century,
+          'cases': int(row[today]),
+          'deaths': int(d2.loc[key, today]),
+          'new_cases': int(row[today] - row[yesterday]),
+          'new_deaths': int(d2.loc[key, today] - d2.loc[key, yesterday]),
+          'counties': {}
+        }
+
+        for k,v in c[c['Province/State']==key].dropna(subset=['Admin2']).iterrows():
+            fips = v['FIPS']
+            admin2 = v['Admin2']
+            addr = '{}/{}'.format(admin2, code)
+            state_data['counties'][addr] = case_data(v[date_columns], d.loc[k, date_columns], fips=fips, county=admin2, population=safe_cast(bg2['population'].get(fips, None)))
+
+        with open(os.path.join(options['TARGET_DIR'], code + '.json'), 'w') as fd:
+            json.dump(state_data, fd)

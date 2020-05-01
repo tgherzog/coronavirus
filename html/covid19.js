@@ -652,11 +652,13 @@ function updateState(state) {
     updateBadges(state, '#banner-state-cases', '#banner-state-deaths');
 
     var code = data['states'][state]['code'];
-    $.get(apiRoot + code + '.json', function(rows) {
+    $.get(apiRoot + code + '.json', function(data) {
         $table = $('#county-table').DataTable();
         $table.clear();
-        for(var i=0;i<rows.length;i++) {
-            $table.row.add([ rows[i]['name'], rows[i]['cases'], rows[i]['new_cases'], rows[i]['avg_growth'], rows[i]['deaths'], rows[i]['new_deaths'] ]);
+        for(key in data['counties']) {
+            row = data['counties'][key];
+            i = row.cases.length - 1;
+            $table.row.add([ row['county'], row.cases[i], row.cases[i] - row.cases[i-1], slope(row.cases).toFixed(2), row.deaths[i], row.deaths[i] - row.deaths[i-1] ]);
         }
 
         $table.draw();
@@ -883,10 +885,6 @@ $(document).ready(function() {
                 return addCommas(data)
             },
             targets: [1, 2, 3, 4, 5]
-          },
-          {
-            visible: false,
-            targets: 3
           }
       ]
     });
