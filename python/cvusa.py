@@ -20,12 +20,14 @@ from wbgapi.economy import coder
 from datetime import datetime
 from github import Github
 import os
+import re
 import sys
 import json
 from pprint import pprint
 from docopt import docopt
 
 options = docopt(__doc__)
+repo = None
 
 def safe_cast(value, to_type=int, default=None):
 
@@ -35,7 +37,9 @@ def safe_cast(value, to_type=int, default=None):
         return default
        
 
-def csse_refs(locale='global'):
+def get_repo_file(path):
+
+    global repo
 
     try:
         git_token = os.environ['GITHUB_ANONYMOUS_TOKEN']
@@ -44,27 +48,25 @@ def csse_refs(locale='global'):
 
     git = Github(git_token)
     repo = git.get_repo('CSSEGISandData/COVID-19')
+    for elem in repo.get_contents(path):
+        yield elem
 
+def csse_refs(locale='global'):
+    c_path = d_path = r_path = None
     if locale == 'global':
         c_url, d_url, r_url = map(lambda x: 'csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_{}_global.csv'.format(x), ['confirmed', 'deaths', 'recovered'])
-        c = repo.get_contents(c_url)
-        d = repo.get_contents(d_url)
-        r = repo.get_contents(r_url)
-
-        c_path, d_path, r_path = c.download_url, d.download_url, r.download_url
         
     elif locale == 'usa':
         c_url, d_url = map(lambda x: 'csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_{}_US.csv'.format(x), ['confirmed', 'deaths'])
+        r_url = None
 
-        # we now need to get a list of file metadata for the parent directory and traverse it to find the object we need. Reason is that
-        # when the file size exceeds 1M get_contents will fail - see https://medium.com/@caludio/how-to-download-large-files-from-github-4863a2dbba3b
-        for elem in repo.get_contents('csse_covid_19_data/csse_covid_19_time_series'):
-            if elem.path == c_url:
-                c = elem
-            elif elem.path == d_url:
-                d = elem
-        
-        c_path, d_path, r_path = c.download_url, d.download_url, None
+    for elem in get_repo_file('csse_covid_19_data/csse_covid_19_time_series'):
+        if elem.path == c_url:
+            c_path = elem.download_url
+        elif elem.path == d_url:
+            d_path = elem.download_url
+        elif elem.path == r_url:
+            r_path = elem.dowload_url
 
     # get the modification date from the latest commit for the confirmed case file
     last_modified = repo.get_commits(path=c_url)[0].last_modified
@@ -164,7 +166,7 @@ data['new_cases'] = int(cases[today] - cases[yesterday])
 data['new_deaths'] = int(deaths[today] - deaths[yesterday])
 
 # This is probably not the official national population estimate, but for this purpose it's close enough
-data['states']['USA'] = case_data(cases[date_columns], deaths[date_columns], code='USA', population=int(bg1['population'].sum()))
+data['states']['USA'] = case_data(cases[date_columns], deaths[date_columns], code='USA', population=int(bg1['population'].sum()), tests=[None]*len(date_columns))
 
 c2 = c.groupby('Province/State').sum()
 d2 = d.groupby('Province/State').sum()
@@ -172,7 +174,7 @@ d2 = d.groupby('Province/State').sum()
 for key,row in c2.iterrows():
     code = bg1['code'].get(key)
     if code:
-        data['states'][key] = case_data(row[date_columns], d2.loc[key, date_columns], code=code, population=int(bg1['population'].get(key)))
+        data['states'][key] = case_data(row[date_columns], d2.loc[key, date_columns], code=code, population=int(bg1['population'].get(key)), tests=[None]*len(date_columns))
 
 for key,row in c.sort_values(today, ascending=False).head(50).iterrows():
     fips = row['FIPS']
@@ -188,6 +190,22 @@ for key,row in c.sort_values(today, ascending=False).head(50).iterrows():
 
     data['counties'][addr] = case_data(row[date_columns], d.loc[key, date_columns], fips=fips, county=admin2, state=row['Province/State'], state_abbr=code, population=safe_cast(bg2['population'].get(fips, None)))
     
+# cycle through the daily files and add test data - eventually could add hospitalizations
+for obj in get_repo_file('csse_covid_19_data/csse_covid_19_daily_reports_us'):
+    x = re.match(r'^(\d{2})-(\d{2})-(\d{4}).csv$', obj.name)
+    if x:
+        ts = '{}/{}/{}'.format(int(x.group(1)), int(x.group(2)), x.group(3))
+        if ts in date_columns_with_century:
+            offset = date_columns_with_century.index(ts)
+            dailies = pd.read_csv(obj.download_url).set_index('Province_State')
+            data['states']['USA']['tests'][offset] = dailies.sum()['People_Tested']
+
+            for key,row in dailies.iterrows():
+                code = bg1['code'].get(key)
+                if code:
+                    data['states'][key]['tests'][offset] = row['People_Tested']
+
+
 with open(os.path.join(options['TARGET_DIR'], 'USA.json'), 'w') as fd:
     json.dump(data, fd)
 
