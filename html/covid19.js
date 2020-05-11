@@ -704,13 +704,13 @@ function addTimeSeries(offset, key) {
             break;
     }
 
-    var n = {label: label, fill: false, backgroundColor: color, borderColor: color, data: series.slice(1)};
+    var n = {label: label, id: key, fill: false, backgroundColor: color, borderColor: color, data: series.slice(1)};
 
     for(var i=0;i<ds.length;i++) {
-        if( ds[i].label == key ) {
+        if( ds[i].id == key ) {
             return;
         }
-        else if( ds[i].label > key ) {
+        else if( ds[i].id > key ) {
             ds.splice(i, 0, n);
             return;
         }
@@ -724,7 +724,7 @@ function deleteTimeSeries(offset, key) {
     var ds = config[offset].data.datasets;
 
     for(var i=0;i<ds.length;i++) {
-        if( ds[i].label == key ) {
+        if( ds[i].id == key ) {
             ds.splice(i, 1);
             return;
         }
