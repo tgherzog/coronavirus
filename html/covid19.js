@@ -141,6 +141,26 @@ function per_capita(value, pop) {
     return value / (pop/1000);
 }
 
+function getCookie(cname, otherwise) {
+
+  if( otherwise === undefined ) otherwise = null;
+
+  var name = cname + "=";
+  var decodedCookie = decodeURIComponent(document.cookie);
+  var ca = decodedCookie.split(';');
+  for(var i = 0; i <ca.length; i++) {
+    var c = ca[i];
+    while (c.charAt(0) == ' ') {
+      c = c.substring(1);
+    }
+    if (c.indexOf(name) == 0) {
+      return c.substring(name.length, c.length);
+    }
+  }
+
+  return otherwise;;
+}
+
 config = [
   // state tab - unified line chart
   {
@@ -317,7 +337,7 @@ config = [
     chart_: null
   },
 
-  // combined chart chart on today tab
+  // combined chart on today tab
   {
     type: 'bar',
     data: {
@@ -769,6 +789,7 @@ function updateState(state, updateMenu) {
     updateBadges(state, '#banner-state-cases', '#banner-state-deaths');
 
     var code = data['states'][state]['code'];
+    document.cookie = 'usState=' + state + '; expires=Tue, 31 Dec 2024 00:00 UTC';
     $.get(apiRoot + code + '.json', function(data) {
         stateData = data;
         $table = $('#county-table').DataTable();
@@ -837,7 +858,7 @@ function initialize() {
         for(i=0;i<4;i++)
             config[i].data.labels = data['days'].slice(dayOffset);
 
-        var default_state = 'Virginia';
+        var default_state = getCookie('usState', 'Virginia');
         $table = $('#state-table').DataTable();
         $tests = $('#tests-table').DataTable();
         i = 0;
@@ -1041,13 +1062,18 @@ $(document).ready(function() {
     $('#state-table').DataTable(tableParams('state', 0));
     $('#county-table').DataTable(tableParams('county', 1));
     $('#topcounty-table').DataTable(tableParams('topcounty', 2));
-    // $('#tests-table').DataTable(tableParams('tests', 3));
     $('#tests-table').DataTable({
       paging: false,
       autoWidth: false,
       searching: true,
       info: false,
       order: [[ 3, 'desc' ]],
+      dom: 'Bfrtip',
+      buttons: [
+        { text: 'Top 5',  action: function() { autoCheck('tests', 3,  5) } },
+        { text: 'Top 10', action: function() { autoCheck('tests', 3, 10) } },
+        { text: 'None',   action: function() { autoCheck('tests', 3, -1) } },
+      ],
       columnDefs: [
           {
             visible: false,
