@@ -44,6 +44,10 @@ label {
   color: red;
 }
 
+.tight p {
+    margin-bottom: 0;
+}
+
 div.row.chart > div {
   margin: 12px 20px;
 }
@@ -93,7 +97,7 @@ p.timestamp span {
   white-space: nowrap;
 }
 
-#state-detail-select, #today-select {
+select {
   font-size: 1.25em;
   margin: 10px 0;
 }

@@ -27,9 +27,10 @@ moreChartColors = [
 "#000000",
 ];
 
-trendLen = 7; // also some static labels in the HTML that need to match any changes here
+trendLen = 14; // also some static labels in the HTML that need to match any changes here
+rollingLen = 7;   // number of days for which to calculate a new cases/death rolling average: 0 to present raw numbers.
 
-panes = [false, false, false, false];
+panes = [false, false, false, false, false];
 formatters = {
     rank: function(items, data) {
         var n = items[0].index + 1;
@@ -65,9 +66,13 @@ formatters = {
     },
     label: function(item, data, offset) {
       var label = data.datasets[item.datasetIndex].label || '', value = undefined;
-      if( offset == 4 ) {
+      if( offset == 3 ) {
+        if( config[3].settings.aggregation == 'ptr' )
+            value = (item.yLabel*100).toFixed(2) + '%';
+      }
+      else if( offset == 4 ) {
         var type = config[4].settings.type;
-        if( type == 'cfr' ) {
+        if( type == 'cfr' || type == 'ptr' ) {
             value = (item.yLabel*100).toFixed(2) + '%';
         }
         else if( type == 'avg_growth' ) {
@@ -113,6 +118,8 @@ function slope(data) {
 
 function addCommas(value, plus=false) {
 
+  if( value == undefined ) return '';
+
   prefix = (plus && value > 0) ? '+' : '';
   return prefix + value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
@@ -123,11 +130,19 @@ function formatCaseValue(value, idx, points=2) {
     return value.toFixed(points);
   }
 
-  return addCommas(value);
+  return addCommas(parseInt(value));
+}
+
+function per_capita(value, pop) {
+
+    if( pop === null || pop == 0 )
+        return 0;
+
+    return value / (pop/1000);
 }
 
 config = [
-  // state tab - cases line chart
+  // state tab - unified line chart
   {
     type: 'line',
     data: {
@@ -163,7 +178,6 @@ config = [
     },
     settings: {
         field: 'cases',
-        cluster: 'states',
         perCapita: false,
         aggregation: 'total',
         uiContainer: '#state-table'
@@ -171,7 +185,7 @@ config = [
     chart_: null
   },
 
-  // state tab - deaths line chart
+  // local tab - unified line chart
   {
     type: 'line',
     data: {
@@ -184,7 +198,7 @@ config = [
           type: 'linear',
           scaleLabel: {
             display: true,
-            labelString: 'Deaths'
+            labelString: 'Cases'
           },
           ticks: {
             maxTicksLimit: 5,
@@ -206,16 +220,15 @@ config = [
       }
     },
     settings: {
-        field: 'deaths',
-        cluster: 'states',
+        field: 'cases',
         perCapita: false,
         aggregation: 'total',
-        uiContainer: '#state-table'
+        uiContainer: '#county-table'
     },
     chart_: null
   },
 
-  // top counties tab - cases line chart
+  // top counties tab - unified line chart
   {
     type: 'line',
     data: {
@@ -251,7 +264,6 @@ config = [
     },
     settings: {
         field: 'cases',
-        cluster: 'counties',
         perCapita: false,
         aggregation: 'total',
         uiContainer: '#topcounty-table'
@@ -259,7 +271,7 @@ config = [
     chart_: null
   },
 
-  // top counties tab - deaths line chart
+  // testing tab - unified chart
   {
     type: 'line',
     data: {
@@ -272,11 +284,14 @@ config = [
           type: 'linear',
           scaleLabel: {
             display: true,
-            labelString: 'Deaths'
+            labelString: 'Tests'
           },
           ticks: {
             maxTicksLimit: 5,
             callback: function(value, index, values) {
+              if( config[3].settings.aggregation == 'ptr' )
+                return formatters.pct_label(value)
+
               return formatCaseValue(value, 3);
             }
           }
@@ -294,11 +309,10 @@ config = [
       }
     },
     settings: {
-        field: 'deaths',
-        cluster: 'counties',
+        field: 'tests',
         perCapita: false,
         aggregation: 'total',
-        uiContainer: '#topcounty-table'
+        uiContainer: '#tests-table'
     },
     chart_: null
   },
@@ -334,7 +348,7 @@ config = [
               var type = config[4].settings.type;
               switch(type) {
                 case 'cfr':
-                // case 'avg_growth':
+                case 'ptr':
                     return formatters.pct_label(value);
               }
 
@@ -491,6 +505,44 @@ config = [
 
 apiRoot = 'http://cvapi.zognet.net/v2/USA/';
 data = {}
+stateData = {}
+dayOffset = 1;  // offset of data that we actually display - ignoring early dates that are less significant
+
+function marginal_value(data, span, n) {
+
+    if( n == undefined ) n = data.length-1;
+    if( span == undefined ) span = 1;
+
+    var sum = 0, i = 0;
+    n -= span-1;
+    while( i < span ) {
+        sum += data[i+n] - data[i+n-1];
+        i++;
+    }
+
+    return sum / span;
+}
+
+function marginal_value_series(data, span, population) {
+
+    if( span == undefined ) span = 1;
+    if( population == undefined ) population = 1;
+
+    var result = new Array(data.length), i = 0;
+
+    // result[0] will always be undefined
+    while( i < span ) {
+        result[i] = undefined;
+        i++;
+    }
+
+    while( i < data.length ) {
+        result[i] = marginal_value(data, span, i) / population;
+        i++;
+    }
+
+    return result;
+}
 
 function updateTodayChart() {
 
@@ -503,6 +555,7 @@ function updateTodayChart() {
         if( key != 'USA' ) {
             cases = data['states'][key]['cases'];
             deaths = data['states'][key]['deaths'];
+            tests = data['states'][key]['tests'];
             n = cases.length - 1;
             if( config[offset].settings.perCapita ) {
                 population = data['states'][key]['population'] / 1000;
@@ -542,6 +595,16 @@ function updateTodayChart() {
                     label = 'Case Fatality Rate';
                     label2 = 'CFR';
                     break;
+                case 'tests':
+                    obs = tests[n] / population;
+                    label = 'Tests' + pc;
+                    label2 = label;
+                    break;
+                case 'ptr':
+                    obs = cases[n] / tests[n];
+                    label = 'Positive Test Rate';
+                    label2 = 'PTR';
+                    break;
             }
 
             today.push({label: key, value: obs});
@@ -565,32 +628,63 @@ function updateTodayChart() {
     }
 }
 
+function dataFromOffset(offset) {
+
+    switch(offset) {
+        case 0:
+            return data['states'];
+        case 1:
+            return stateData['counties'];
+        case 2:
+            return data['counties'];
+        case 3:
+            return data['states'];
+    }
+
+    return undefined;
+}
+
 function addTimeSeries(offset, key) {
 
+    var data = dataFromOffset(offset);
     var type = config[offset].settings.field;
-    var cluster = config[offset].settings.cluster;
     var ds = config[offset].data.datasets;
-    var color = data[cluster][key]['lineColor'];
+    var color = data[key]['lineColor'];
     var series = [];
     var population = 1;
+    var label = offset == 1 ? data[key].county : key;
+
+    data = dataFromOffset(offset);
 
     if( config[offset].settings.perCapita ) {
-        population = data[cluster][key]['population'] / 1000;
+        population = data[key]['population'] / 1000;
     }
 
     // here we grab 1 prior value so we can calculate 'new' cases if necessary. Then we start indexing from 1
-    var data_ = data[cluster][key][type].slice(data.dayOffset-1);
-    var cases;
-    for(var i=1;i<data_.length;i++) {
-        cases = data_[i];
-        if( config[offset].settings.aggregation == 'new' ) {
-            cases = cases - data_[i-1];
-        }
+    var data_ = data[key][type].slice(dayOffset-1);
+    switch(config[offset].settings.aggregation) {
+        case 'total':
+            series = data_;
+            for(var i=0;i<series.length;i++)
+                if( series[i] !== null )
+                    series[i] /= population;
 
-        series.push(cases / population);
+            break;
+        case 'new':
+            series = marginal_value_series(data_, 1, population);
+            break;
+        case 'avg':
+            series = marginal_value_series(data_, rollingLen, population);
+            break;
+        case 'ptr':
+            series = data_;
+            var cases = data[key]['cases'].slice(dayOffset-1);
+            for(var i=0;i<series.length;i++)
+                series[i] = cases[i] / series[i];
+            break;
     }
 
-    var n = {label: key, fill: false, backgroundColor: color, borderColor: color, data: series};
+    var n = {label: label, fill: false, backgroundColor: color, borderColor: color, data: series.slice(1)};
 
     for(var i=0;i<ds.length;i++) {
         if( ds[i].label == key ) {
@@ -624,9 +718,15 @@ function updateTimeSeries(offset) {
         addTimeSeries(offset, $(this).val());
     });
 
-    var field = capitalize(config[offset].settings.aggregation) + ' ' + capitalize(config[offset].settings.field);
-    if( config[offset].settings.perCapita ) {
-        field = field + '/1,000';
+    var field = '';
+    if( config[offset].settings.aggregation == 'ptr' )
+        field = 'Positive Test Rate';
+    else {
+        var agg = config[offset].settings.aggregation == 'total' ? 'total' : 'new';
+        field = capitalize(agg) + ' ' + capitalize(config[offset].settings.field);
+        if( config[offset].settings.perCapita ) {
+            field = field + '/1,000';
+        }
     }
 
     config[offset].options.scales.yAxes[0].scaleLabel.labelString = field;
@@ -639,29 +739,77 @@ function updateBadges(state, caseID, deathsID) {
     var n = cases.length;
 
     $(caseID).find('.total').text(addCommas(cases[n-1]));
-    $(caseID).find('.new').text(addCommas(cases[n-1] - cases[n-2], true));
+    $(caseID).find('.new').text(addCommas(marginal_value(cases)));
+    $(caseID).find('.avg').text(addCommas(marginal_value(cases, rollingLen).toFixed(0)));
     $(caseID).find('.trend').text(addCommas(slope(cases).toFixed(0), true));
 
     $(deathsID).find('.total').text(addCommas(deaths[n-1]));
-    $(deathsID).find('.new').text(addCommas(deaths[n-1] - deaths[n-2], true));
+    $(deathsID).find('.new').text(addCommas(marginal_value(deaths)));
+    $(deathsID).find('.avg').text(addCommas(marginal_value(deaths, rollingLen).toFixed(0)));
     $(deathsID).find('.trend').text(addCommas(slope(deaths).toFixed(0), true));
 }
 
-function updateState(state) {
+function tableCheckbox(val, id) {
+    
+    return $('<input type="checkbox"/>').val(val).attr('name', id).attr('id', id).addClass('form-check-input');
+}
+
+function tableCheckboxClick(ch, offset) {
+
+    if( ch.checked )
+        addTimeSeries(offset, $(ch).val());
+    else
+        deleteTimeSeries(offset, $(ch).val())
+
+    config[offset].chart_.update();
+}
+
+function updateState(state, updateMenu) {
 
     updateBadges(state, '#banner-state-cases', '#banner-state-deaths');
 
     var code = data['states'][state]['code'];
     $.get(apiRoot + code + '.json', function(data) {
+        stateData = data;
         $table = $('#county-table').DataTable();
+        var sorter = $table.order()[0];
         $table.clear();
+        case_list = [];
+        var i, n = 0;
         for(key in data['counties']) {
+            if( n == moreChartColors.length ) n = 0;
+                stateData['counties'][key]['lineColor'] = moreChartColors[n++];
+
             row = data['counties'][key];
+            var pop = row.population;
             i = row.cases.length - 1;
-            $table.row.add([ row['county'], row.cases[i], row.cases[i] - row.cases[i-1], slope(row.cases).toFixed(2), row.deaths[i], row.deaths[i] - row.deaths[i-1] ]);
+            var new_cases = row.cases[i] - row.cases[i-1], new_deaths = row.deaths[i] - row.deaths[i-1];
+            $chk = tableCheckbox(key, 'chk-county-' + row.fips);
+            var elems = [ row.fips, $chk.prop('outerHTML'), row.county,
+                row.cases[i], per_capita(row.cases[i], pop),
+                new_cases, per_capita(new_cases, pop),
+                slope(row.cases),
+                row.deaths[i], per_capita(row.deaths[i], pop),
+                new_deaths, per_capita(new_deaths, pop),
+                slope(row.deaths)
+            ];
+            $table.row.add(elems);
+            case_list.push({code: row.fips, cases: elems[sorter[0]]});
         }
 
         $table.draw();
+        $('#county-table input').click(function(event) {
+            tableCheckboxClick(this, 1);
+        });
+
+        case_list.sort(function(a, b) { return (a.cases - b.cases) * (sorter[1] == 'asc' ? 1 : -1)  });
+        for(i=0;i<Math.min(5, case_list.length);i++) {
+            $('#chk-county-' + case_list[i].code).prop('checked', true);
+        }
+
+        updateTimeSeries(1);
+        if( updateMenu === true )
+            config[1].chart_.update();
     });
 }
 
@@ -671,69 +819,83 @@ function initialize() {
         data = data_;
 
         qs = new Querystring();
-        trendLen = qs.get('trend', 14);
-        $('.trendlen').text(trendLen.toString());
+        trendLen = qs.get('trend', trendLen, true);
+        rollingLen = qs.get('rolling', rollingLen, true);
+        $('span.trendlen').text(trendLen.toString());
+        $('span.rolling').text(rollingLen.toString());
+
+        var d = new Date(data['update_date_epoch'] * 1000);
+        $('#updated').text(d.toLocaleString());
+        $('#newdate').text(data['most_recent_day']);
 
         // ignore dates that have less than 25 cases, which just happens to be all of February
-        data.dayOffset = 0;
-        while( data.dayOffset < data['states']['USA']['cases'].length && data['states']['USA']['cases'][data.dayOffset] < 25 )
-            data.dayOffset++;
+        dayOffset = 0;
+        while( dayOffset < data['states']['USA']['cases'].length && data['states']['USA']['cases'][dayOffset] < 25 )
+            dayOffset++;
 
         var i = 0, stats = {}, case_list = [];
+        for(i=0;i<4;i++)
+            config[i].data.labels = data['days'].slice(dayOffset);
+
         var default_state = 'Virginia';
         $table = $('#state-table').DataTable();
+        $tests = $('#tests-table').DataTable();
+        i = 0;
         for(var key in data['states']) {
             // assign constant chart colors for states
             data['states'][key]['lineColor'] = moreChartColors[i++];
             
             var cases = data['states'][key]['cases'];
             var deaths = data['states'][key]['deaths'];
+            var tests = data['states'][key]['tests'];
             var n = cases.length - 1;
-            var code = data['states'][key]['code']
+            var code = data['states'][key]['code'];
+            var pop = data['states'][key]['population']/1000;
 
-            stats.cases = cases[n];
-            stats.deaths = deaths[n];
-            stats.new_cases = stats.cases - cases[n-1];
-            stats.new_deaths = stats.deaths - deaths[n-1];
-            stats.avg_growth = slope(cases).toFixed(2);
+            var new_cases = cases[n] - cases[n-1];
+            var new_deaths = deaths[n] - deaths[n-1];
 
-            var chk_name = 'chk-state-' + code;
-            $chk = $('<input type="checkbox"/>').val(key).attr('name', chk_name).attr('id', chk_name).addClass('form-check-input');
-            var row = $table.row.add([code, $chk.prop('outerHTML'), key, stats.cases, stats.new_cases, stats.avg_growth, stats.deaths, stats.new_deaths]).node();
+            $chk = tableCheckbox(key, 'chk-state-' + code);
+            var row = $table.row.add([code, $chk.prop('outerHTML'), key,
+              cases[n], cases[n]/pop,
+              new_cases, new_cases/pop,
+              slope(cases),
+              deaths[n], deaths[n]/pop,
+              new_deaths, new_deaths/pop,
+              slope(deaths)
+            ]).node();
             if( key == 'USA' ) {
                 $(row).addClass('aggregate');
             }
             else {
-                case_list.push({code: code, cases: stats.cases});
-                var st_label = key;
-                if( code == 'DC' ) {
-                    st_label = code;
-                }
-
+                case_list.push({code: code, cases: cases[n], tests: tests[n]});
                 $opt = $('<option/>').val(key).attr('selected', key == default_state).text(key);
                 $('#state-detail-select').append($opt);
             }
+
+            $chk = tableCheckbox(key, 'chk-tests-' + code);
+            var row = $tests.row.add([code, $chk.prop('outerHTML'), key,
+              tests[n], tests[n]/pop, cases[n]/tests[n]
+            ]).node();
+            if( key == 'USA' )
+              $(row).addClass('aggregate');
         }
 
         $table.draw();
+        $tests.draw();
         $('#state-table input').click(function(event) {
-            if( this.checked ) {
-                addTimeSeries(0, $(this).val());
-                addTimeSeries(1, $(this).val());
-            }
-            else {
-                deleteTimeSeries(0, $(this).val());
-                deleteTimeSeries(1, $(this).val());
-            }
+            tableCheckboxClick(this, 0);
+        });
 
-            config[0].chart_.update();
-            config[1].chart_.update();
+        $('#tests-table input').click(function(event) {
+            tableCheckboxClick(this, 3);
         });
 
         if( (user_states = qs.get('states'))  ) {
             user_states = user_states.split(',');
             for(i=0;i<user_states.length;i++) {
                 $('#chk-state-' + user_states[i]).prop('checked', true);
+                $('#chk-test-state-' + user_states[i]).prop('checked', true);
             }
         }
         else {
@@ -741,25 +903,24 @@ function initialize() {
             for(i=0;i<5;i++) {
                 $('#chk-state-' + case_list[i].code).prop('checked', true);
             }
+
+            case_list.sort(function(b, a) { return a.tests - b.tests });
+            for(i=0;i<5;i++) {
+                $('#chk-tests-' + case_list[i].code).prop('checked', true);
+            }
         }
 
-        config[0].data.labels = config[1].data.labels = data['days'].slice(data.dayOffset);
         updateTimeSeries(0);
-        updateTimeSeries(1);
-
-        var d = new Date(data['update_date_epoch'] * 1000);
-        $('#updated').text(d.toLocaleString());
-        $('#newdate').text(data['most_recent_day']);
+        updateTimeSeries(3);
 
         updateBadges('USA', '#banner-cases', '#banner-deaths');
         updateState(default_state);
-
 
         $table = $('#topcounty-table').DataTable();
         i = 0;
         case_list = [];
         for(var key in data['counties']) {
-            // assign constant chart colors for states
+            // assign constant chart colors for counties
             if( i == moreChartColors.length ) i = 0;
 
             data['counties'][key]['lineColor'] = moreChartColors[i++];
@@ -771,7 +932,10 @@ function initialize() {
             var st_name = data['counties'][key]['state']
             var cty_name = data['counties'][key]['county']
             var fips = data['counties'][key]['fips']
+            var pop = data['counties'][key]['population']/1000;
 
+            var new_cases = cases[n] - cases[n-1];
+            var new_deaths = deaths[n] - deaths[n-1];
             stats.cases = cases[n];
             stats.deaths = deaths[n];
             stats.new_cases = stats.cases - cases[n-1];
@@ -780,23 +944,20 @@ function initialize() {
 
             var chk_name = 'chk-topcounty-' + fips;
             $chk = $('<input type="checkbox"/>').val(key).attr('name', chk_name).attr('id', chk_name).addClass('form-check-input');
-            var row = $table.row.add([fips, $chk.prop('outerHTML'), key, stats.cases, stats.new_cases, stats.avg_growth, stats.deaths, stats.new_deaths]).node();
+            var row = $table.row.add([fips, $chk.prop('outerHTML'), key,
+              cases[n], cases[n]/pop,
+              new_cases, new_cases/pop,
+              slope(cases),
+              deaths[n], deaths[n]/pop,
+              new_deaths, new_deaths/pop,
+              slope(deaths)
+            ]).node();
             case_list.push({code: fips, cases: stats.cases});
         }
 
         $table.draw();
         $('#topcounty-table input').click(function(event) {
-            if( this.checked ) {
-                addTimeSeries(2, $(this).val());
-                addTimeSeries(3, $(this).val());
-            }
-            else {
-                deleteTimeSeries(2, $(this).val());
-                deleteTimeSeries(3, $(this).val());
-            }
-
-            config[2].chart_.update();
-            config[3].chart_.update();
+            tableCheckboxClick(this, 2);
         });
 
         case_list.sort(function(b, a) { return a.cases - b.cases });
@@ -804,12 +965,10 @@ function initialize() {
             $('#chk-topcounty-' + case_list[i].code).prop('checked', true);
         }
 
-        config[2].data.labels = config[3].data.labels = data['days'].slice(data.dayOffset);
+        config[2].data.labels = data['days'].slice(dayOffset);
         updateTimeSeries(2);
-        updateTimeSeries(3);
 
         updateTodayChart();
-        // config[4].chart_.update();
         config[4].chart_ = new Chart($('#chart5'), config[4]);
     });
 }
@@ -822,9 +981,7 @@ function autoCheck(id, offset, n) {
     });
 
     updateTimeSeries(offset);
-    updateTimeSeries(offset+1);
     config[offset].chart_.update();
-    config[offset+1].chart_.update();
 }
 
 function tableParams(id, offset) {
@@ -849,6 +1006,50 @@ function tableParams(id, offset) {
       ],
       columnDefs: [
           {
+            orderable: false,
+            targets: 1
+          },
+          {
+            render: function(data) {
+                return addCommas(data)
+            },
+            targets: [3, 5, 8, 10]
+          },
+          {
+            render: function(data) {
+                return data.toFixed(3)
+            },
+            targets: [4, 6, 9, 11]
+          },
+          {
+            render: function(data) {
+                return data.toFixed(2)
+            },
+            targets: [7, 12]
+          },
+          {
+            visible: false,
+            targets: [0, 8, 9, 10, 11, 12]
+          }
+      ]
+    };
+}
+
+$(document).ready(function() {
+
+
+    $('#state-table').DataTable(tableParams('state', 0));
+    $('#county-table').DataTable(tableParams('county', 1));
+    $('#topcounty-table').DataTable(tableParams('topcounty', 2));
+    // $('#tests-table').DataTable(tableParams('tests', 3));
+    $('#tests-table').DataTable({
+      paging: false,
+      autoWidth: false,
+      searching: true,
+      info: false,
+      order: [[ 3, 'desc' ]],
+      columnDefs: [
+          {
             visible: false,
             targets: 0
           },
@@ -859,37 +1060,25 @@ function tableParams(id, offset) {
           {
             render: function(data) {
                 return addCommas(data)
-            }
-            ,
-            targets: [3, 4, 5, 6, 7]
-          }
-      ]
-    };
-}
-
-$(document).ready(function() {
-
-
-    $('#state-table').DataTable(tableParams('state', 0));
-    $('#topcounty-table').DataTable(tableParams('topcounty', 2));
-
-    $('#county-table').DataTable({
-      paging: false,
-      autoWidth: false,
-      searching: true,
-      info: false,
-      order: [[ 1, 'desc' ]],
-      columnDefs: [
+            },
+            targets: 3
+          },
           {
             render: function(data) {
-                return addCommas(data)
+                return data.toFixed(3);
             },
-            targets: [1, 2, 3, 4, 5]
+            targets: 4
+          },
+          {
+            render: function(data) {
+                return formatters.pct_label(data);
+            },
+            targets: 5
           }
       ]
     });
 
-    $('#ch1-logscale, #ch2-logscale, #ch3-logscale, #ch4-logscale, #ch5-logscale').change(function() {
+    $('input.logscale').change(function() {
         var offset = parseInt($(this).attr('data-offset'));
         if( this.checked ) {
             config[offset].options.scales.yAxes[0].type = 'logarithmic';
@@ -901,7 +1090,7 @@ $(document).ready(function() {
         config[offset].chart_.update();
     });
 
-    $('#ch1-percapita, #ch2-percapita, #ch3-percapita, #ch4-percapita').change(function() {
+    $('input.percapita').change(function() {
       var offset = parseInt($(this).attr('data-offset'));
       config[offset].settings.perCapita = this.checked;
       updateTimeSeries(offset);
@@ -915,17 +1104,37 @@ $(document).ready(function() {
       config[offset].chart_.update();
     });
 
-    $('#ch1-switch-total, #ch1-switch-new, #ch2-switch-total, #ch2-switch-new, #ch3-switch-total, #ch3-switch-new, #ch4-switch-total, #ch4-switch-new').change(function() {
+    $('#states-select, #local-select, #topcounty-select, #test-select').change(function() {
         var offset = parseInt($(this).attr('data-offset'));
-
-        config[offset].settings.aggregation = $(this).val();
+        var parts = $(this).val().split('-');
+        config[offset].settings.field = parts[0];
+        config[offset].settings.aggregation = parts[1];
         updateTimeSeries(offset);
+
+        if( offset == 3 ) {
+            if( parts[1] == 'ptr' ) {
+                $('#chart4-tab .chart-wrapper input').prop('checked', false).prop('disabled', true);
+                config[3].settings.perCapita = false;
+            }
+            else
+                $('#chart4-tab .chart-wrapper input').removeAttr('disabled');
+        }
+        else {
+            $table = $(config[offset].settings.uiContainer).DataTable();
+            for(var i=3;i<13;i++) {
+                if( parts[0] == 'cases' )
+                    $table.column(i).visible(i<8);
+                else
+                    $table.column(i).visible(i>=8);
+            }
+            $table.draw();
+        }
+
         config[offset].chart_.update();
-        console.log('switch: ' + offset);
     });
 
     $('#state-detail-select').change(function() {
-      updateState($(this).val());
+      updateState($(this).val(), true);
     });
 
     $('#today-select').change(function() {
@@ -941,10 +1150,14 @@ $(document).ready(function() {
         panes[p] = true;
         if( p == 1 ) {
             config[0].chart_ = new Chart($('#chart1'), config[0]);
+        }
+        else if( p == 2 ) {
             config[1].chart_ = new Chart($('#chart2'), config[1]);
         }
         else if( p == 3 ) {
             config[2].chart_ = new Chart($('#chart3'), config[2]);
+        }
+        else if( p == 4 ) {
             config[3].chart_ = new Chart($('#chart4'), config[3]);
         }
     });
