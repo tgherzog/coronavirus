@@ -32,6 +32,21 @@ rollingLen = 7;   // number of days for which to calculate a new cases/death rol
 
 panes = [false, false, false, false, false];
 formatters = {
+    number: function(value, dp=0, plus=false) {
+          if( value == undefined ) return '';
+
+          prefix = (plus && value > 0) ? '+' : '';
+          var a = parseInt(value)
+          var b = Math.abs(value - a);
+
+          a = a.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+
+          if( dp > 0 )
+            return prefix + a + b.toFixed(dp).substr(1);
+
+          return a;
+    },
+
     rank: function(items, data) {
         var n = items[0].index + 1;
         var x = n % 10;
@@ -57,12 +72,12 @@ formatters = {
     },
     title: function(items, data, offset) {
         var state_name = items[0].xLabel;
-        var total = 0;
+        var total = 0, value;
         items.forEach(function(item) {
           total += item.yLabel;
         });
 
-        return state_name + ': ' + formatCaseValue(total, offset, 3);
+        return state_name + ': ' + formatters.number(total, config[offset].settings.perCapita ? 2 : 0);
     },
     label: function(item, data, offset) {
       var label = data.datasets[item.datasetIndex].label || '', value = undefined, type;
@@ -74,10 +89,10 @@ formatters = {
       if( type == 'ptr' || type == 'cfr' )
         value = (item.yLabel*100).toFixed(2) + '%';
       else if( type == 'avg_growth' )
-        value = addCommas(item.yLabel, 2);
+        value = formatters.number(item.yLabel, 2);
 
       if( value == undefined )
-        value = formatCaseValue(item.yLabel, offset, 3);
+        value = formatters.number(item.yLabel, config[offset].settings.perCapita ? 2 : 0);
 
       return label + ': ' + value;
     },
@@ -135,28 +150,9 @@ function trendline(data, labels) {
 }
 
 
-function addCommas(value, dp=0, plus=false) {
+function formatCaseValue(value, idx) {
 
-  if( value == undefined ) return '';
-
-  prefix = (plus && value > 0) ? '+' : '';
-  var a = parseInt(value)
-  var b = Math.abs(value - a);
-
-  a = a.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-
-  if( dp > 0 )
-    return prefix + a + b.toFixed(dp).substr(1);
-
-  return a;
-}
-
-function formatCaseValue(value, idx, points=2) {
-
-  if( config[idx].settings.perCapita )
-    return value.toFixed(points);
-
-  return addCommas(parseInt(value));
+  return formatters.number(value, config[idx].settings.perCapita ? 2 : 0);
 }
 
 function per_capita(value, pop) {
@@ -823,15 +819,15 @@ function updateBadges(state, caseID, deathsID) {
     var deaths = data['states'][state]['deaths'];
     var n = cases.length;
 
-    $(caseID).find('.total').text(addCommas(cases[n-1]));
-    $(caseID).find('.new').text(addCommas(marginal_value(cases)));
-    $(caseID).find('.avg').text(addCommas(marginal_value(cases, rollingLen)));
-    $(caseID).find('.trend').text(addCommas(marginal_slope(cases).toFixed(0), 0, true));
+    $(caseID).find('.total').text(formatters.number(cases[n-1]));
+    $(caseID).find('.new').text(formatters.number(marginal_value(cases)));
+    $(caseID).find('.avg').text(formatters.number(marginal_value(cases, rollingLen)));
+    $(caseID).find('.trend').text(formatters.number(marginal_slope(cases).toFixed(0), 0, true));
 
-    $(deathsID).find('.total').text(addCommas(deaths[n-1]));
-    $(deathsID).find('.new').text(addCommas(marginal_value(deaths)));
-    $(deathsID).find('.avg').text(addCommas(marginal_value(deaths, rollingLen)));
-    $(deathsID).find('.trend').text(addCommas(marginal_slope(deaths).toFixed(0), 0, true));
+    $(deathsID).find('.total').text(formatters.number(deaths[n-1]));
+    $(deathsID).find('.new').text(formatters.number(marginal_value(deaths)));
+    $(deathsID).find('.avg').text(formatters.number(marginal_value(deaths, rollingLen)));
+    $(deathsID).find('.trend').text(formatters.number(marginal_slope(deaths).toFixed(0), 0, true));
 }
 
 function tableCheckbox(val, id) {
@@ -1104,7 +1100,7 @@ function tableParams(id, offset) {
           },
           {
             render: function(data) {
-                return addCommas(data)
+                return formatters.number(data)
             },
             targets: [3, 5, 8, 10]
           },
@@ -1157,7 +1153,7 @@ $(document).ready(function() {
           },
           {
             render: function(data) {
-                return addCommas(data)
+                return formatters.number(data)
             },
             targets: 3
           },
