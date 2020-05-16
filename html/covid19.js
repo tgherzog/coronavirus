@@ -65,24 +65,19 @@ formatters = {
         return state_name + ': ' + formatCaseValue(total, offset, 3);
     },
     label: function(item, data, offset) {
-      var label = data.datasets[item.datasetIndex].label || '', value = undefined;
-      if( offset == 3 ) {
-        if( config[3].settings.aggregation == 'ptr' )
-            value = (item.yLabel*100).toFixed(2) + '%';
-      }
-      else if( offset == 4 ) {
-        var type = config[4].settings.type;
-        if( type == 'cfr' || type == 'ptr' ) {
-            value = (item.yLabel*100).toFixed(2) + '%';
-        }
-        else if( type == 'avg_growth' ) {
-            value = formatCaseValue(item.yLabel.toFixed(2), offset, 3);
-        }
-      }
+      var label = data.datasets[item.datasetIndex].label || '', value = undefined, type;
+      if( offset == 4 )
+          type = config[offset].settings.type;
+      else
+          type = config[offset].settings.aggregation;
+            
+      if( type == 'ptr' || type == 'cfr' )
+        value = (item.yLabel*100).toFixed(2) + '%';
+      else if( type == 'avg_growth' )
+        value = addCommas(item.yLabel, 2);
 
-      if( value == undefined ) {
+      if( value == undefined )
         value = formatCaseValue(item.yLabel, offset, 3);
-      }
 
       return label + ': ' + value;
     },
@@ -100,35 +95,66 @@ function capitalize(str) {
     return str[0].toUpperCase() + str.slice(1);
 }
 
-function slope(data) {
+function slope_intercept(data) {
 
-  var yArray = data.slice(-trendLen-1);
-  var i, n = yArray.length-1;
+  var yArray = data.slice(-trendLen);
+  var i, n = yArray.length;
   var sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
 
   for(var i=0;i<n;i++) {
     sumX += i;
-    sumY += yArray[i+1] - yArray[i];
-    sumXY += i * (yArray[i+1] - yArray[i]);
+    sumY += yArray[i];
+    sumXY += i * yArray[i];
     sumXX += i * i;
   }
 
-  return (n*sumXY - sumX*sumY) / (n*sumXX - sumX*sumX);
+  var slope = (n*sumXY - sumX*sumY) / (n*sumXX - sumX*sumX);
+  var intercept = (sumY - slope * sumX) / n;
+
+  return { slope: slope, intercept: intercept };
 }
 
-function addCommas(value, plus=false) {
+function slope(data) {
+
+    var x = slope_intercept(data);
+    return x.slope;
+}
+
+function marginal_slope(data) {
+    
+    return slope(marginal_value_series(data));
+}
+
+function trendline(data, labels) {
+
+    si = slope_intercept(data);
+    return [
+      {x: labels[labels.length-trendLen], y: si.intercept},
+      {x: labels[labels.length-1], y: si.intercept + si.slope * (trendLen-1)}
+    ];
+}
+
+
+function addCommas(value, dp=0, plus=false) {
 
   if( value == undefined ) return '';
 
   prefix = (plus && value > 0) ? '+' : '';
-  return prefix + value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  var a = parseInt(value)
+  var b = Math.abs(value - a);
+
+  a = a.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+
+  if( dp > 0 )
+    return prefix + a + b.toFixed(dp).substr(1);
+
+  return a;
 }
 
 function formatCaseValue(value, idx, points=2) {
 
-  if( config[idx].settings.perCapita ) {
+  if( config[idx].settings.perCapita )
     return value.toFixed(points);
-  }
 
   return addCommas(parseInt(value));
 }
@@ -159,6 +185,25 @@ function getCookie(cname, otherwise) {
   }
 
   return otherwise;;
+}
+
+function trendlineTooltipFilter(item) { return item.label[0] != '-' }
+function trendlineLegendLabelFilter(item) { return item.text[0] != '-' }
+function trendlineClickHandler(e, item) {
+
+    var index = item.datasetIndex;
+    let ci = this.chart;
+    
+    [index, index+1].forEach(function(i) {
+        if( i < ci.config.data.datasets.length ) {
+            meta = ci.getDatasetMeta(i);
+            label = ci.config.data.datasets[i].label;
+            if( i == index || label[0] == '-' )
+                meta.hidden = meta.hidden === null ? !ci.data.datasets[i].hidden : null;
+        }
+    });
+
+    ci.update();
 }
 
 config = [
@@ -530,8 +575,8 @@ dayOffset = 1;  // offset of data that we actually display - ignoring early date
 
 function marginal_value(data, span, n) {
 
-    if( n == undefined ) n = data.length-1;
-    if( span == undefined ) span = 1;
+    if( n == null ) n = data.length-1;
+    if( span == null ) span = 1;
 
     var sum = 0, i = 0;
     n -= span-1;
@@ -545,8 +590,8 @@ function marginal_value(data, span, n) {
 
 function marginal_value_series(data, span, population) {
 
-    if( span == undefined ) span = 1;
-    if( population == undefined ) population = 1;
+    if( span == null ) span = 1;
+    if( population == null ) population = 1;
 
     var result = new Array(data.length), i = 0;
 
@@ -556,9 +601,18 @@ function marginal_value_series(data, span, population) {
         i++;
     }
 
-    while( i < data.length ) {
-        result[i] = marginal_value(data, span, i) / population;
-        i++;
+    // for simple differences, save time by not computing an average
+    if( span == 1 ) {
+        while( i < data.length ) {
+            result[i] = data[i] - data[i-1];
+            i++;
+        }
+    }
+    else {
+        while( i < data.length ) {
+            result[i] = marginal_value(data, span, i) / population;
+            i++;
+        }
     }
 
     return result;
@@ -573,9 +627,9 @@ function updateTodayChart() {
     var pc = config[offset].settings.perCapita ? '/1,000' : '';
     for(var key in data['states']) {
         if( key != 'USA' ) {
-            cases = data['states'][key]['cases'];
-            deaths = data['states'][key]['deaths'];
-            tests = data['states'][key]['tests'];
+            var cases = data['states'][key]['cases'];
+            var deaths = data['states'][key]['deaths'];
+            var tests = data['states'][key]['tests'];
             n = cases.length - 1;
             if( config[offset].settings.perCapita ) {
                 population = data['states'][key]['population'] / 1000;
@@ -606,7 +660,7 @@ function updateTodayChart() {
                     label2 = label;
                     break;
                 case 'avg_growth':
-                    obs = slope(cases);
+                    obs = marginal_slope(cases);
                     label = 'Daily Trend';
                     label2 = label;
                     break;
@@ -670,9 +724,10 @@ function addTimeSeries(offset, key) {
     var type = config[offset].settings.field;
     var ds = config[offset].data.datasets;
     var color = data[key]['lineColor'];
-    var series = [];
+    var series = null;
     var population = 1;
     var label = offset == 1 ? data[key].county : key;
+    var seriesType = config[offset].settings.aggregation;
 
     data = dataFromOffset(offset);
 
@@ -682,7 +737,7 @@ function addTimeSeries(offset, key) {
 
     // here we grab 1 prior value so we can calculate 'new' cases if necessary. Then we start indexing from 1
     var data_ = data[key][type].slice(dayOffset-1);
-    switch(config[offset].settings.aggregation) {
+    switch(seriesType) {
         case 'total':
             series = data_;
             for(var i=0;i<series.length;i++)
@@ -705,6 +760,11 @@ function addTimeSeries(offset, key) {
     }
 
     var n = {label: label, id: key, fill: false, backgroundColor: color, borderColor: color, data: series.slice(1)};
+    var t = {...n}
+    t.label = '-' + t.label;
+    t.borderWidth = 1;
+    t.pointRadius = 0;
+    t.data = trendline(series, config[offset].data.labels);
 
     for(var i=0;i<ds.length;i++) {
         if( ds[i].id == key ) {
@@ -712,22 +772,27 @@ function addTimeSeries(offset, key) {
         }
         else if( ds[i].id > key ) {
             ds.splice(i, 0, n);
+            if( seriesType == 'new' )
+                ds.splice(i+1, 0, t);
+
             return;
         }
     }
 
     ds.push(n);
+    if( seriesType == 'new' )
+        ds.push(t);
 }
 
 function deleteTimeSeries(offset, key) {
 
-    var ds = config[offset].data.datasets;
+    var ds = config[offset].data.datasets, i = 0;
 
-    for(var i=0;i<ds.length;i++) {
-        if( ds[i].id == key ) {
+    while( i < ds.length ) {
+        if( ds[i].id == key )
             ds.splice(i, 1);
-            return;
-        }
+        else
+            i++;
     }
 }
 
@@ -760,13 +825,13 @@ function updateBadges(state, caseID, deathsID) {
 
     $(caseID).find('.total').text(addCommas(cases[n-1]));
     $(caseID).find('.new').text(addCommas(marginal_value(cases)));
-    $(caseID).find('.avg').text(addCommas(marginal_value(cases, rollingLen).toFixed(0)));
-    $(caseID).find('.trend').text(addCommas(slope(cases).toFixed(0), true));
+    $(caseID).find('.avg').text(addCommas(marginal_value(cases, rollingLen)));
+    $(caseID).find('.trend').text(addCommas(marginal_slope(cases).toFixed(0), 0, true));
 
     $(deathsID).find('.total').text(addCommas(deaths[n-1]));
     $(deathsID).find('.new').text(addCommas(marginal_value(deaths)));
-    $(deathsID).find('.avg').text(addCommas(marginal_value(deaths, rollingLen).toFixed(0)));
-    $(deathsID).find('.trend').text(addCommas(slope(deaths).toFixed(0), true));
+    $(deathsID).find('.avg').text(addCommas(marginal_value(deaths, rollingLen)));
+    $(deathsID).find('.trend').text(addCommas(marginal_slope(deaths).toFixed(0), 0, true));
 }
 
 function tableCheckbox(val, id) {
@@ -809,10 +874,10 @@ function updateState(state, updateMenu) {
             var elems = [ row.fips, $chk.prop('outerHTML'), row.county,
                 row.cases[i], per_capita(row.cases[i], pop),
                 new_cases, per_capita(new_cases, pop),
-                slope(row.cases),
+                marginal_slope(row.cases),
                 row.deaths[i], per_capita(row.deaths[i], pop),
                 new_deaths, per_capita(new_deaths, pop),
-                slope(row.deaths)
+                marginal_slope(row.deaths)
             ];
             $table.row.add(elems);
             case_list.push({code: row.fips, cases: elems[sorter[0]]});
@@ -836,6 +901,18 @@ function updateState(state, updateMenu) {
 
 function initialize() {
 
+    for(var i=0;i<config.length;i++)
+        if( config[i].type == 'line' ) {
+            if( typeof(config[i].options) == 'undefined' ) config[i].options = {};
+            if( typeof(config[i].options.tooltips) == 'undefined' ) config[i].options.tooltips = {};
+            if( typeof(config[i].options.legend) == 'undefined' ) config[i].options.legend = {};
+            if( typeof(config[i].options.legend.labels) == 'undefined' ) config[i].options.legend.labels = {};
+
+            config[i].options.tooltips.filter = trendlineTooltipFilter;
+            config[i].options.legend.labels.filter = trendlineLegendLabelFilter;
+            config[i].options.legend.onClick = trendlineClickHandler;
+        }
+
     $.get(apiRoot + 'USA.json', function(data_) {
         data = data_;
 
@@ -854,7 +931,7 @@ function initialize() {
         while( dayOffset < data['states']['USA']['cases'].length && data['states']['USA']['cases'][dayOffset] < 25 )
             dayOffset++;
 
-        var i = 0, stats = {}, case_list = [];
+        var i = 0, case_list = [];
         for(i=0;i<4;i++)
             config[i].data.labels = data['days'].slice(dayOffset);
 
@@ -880,10 +957,10 @@ function initialize() {
             var row = $table.row.add([code, $chk.prop('outerHTML'), key,
               cases[n], cases[n]/pop,
               new_cases, new_cases/pop,
-              slope(cases),
+              marginal_slope(cases),
               deaths[n], deaths[n]/pop,
               new_deaths, new_deaths/pop,
-              slope(deaths)
+              marginal_slope(deaths)
             ]).node();
             if( key == 'USA' ) {
                 $(row).addClass('aggregate');
@@ -957,23 +1034,18 @@ function initialize() {
 
             var new_cases = cases[n] - cases[n-1];
             var new_deaths = deaths[n] - deaths[n-1];
-            stats.cases = cases[n];
-            stats.deaths = deaths[n];
-            stats.new_cases = stats.cases - cases[n-1];
-            stats.new_deaths = stats.deaths - deaths[n-1];
-            stats.avg_growth = slope(cases).toFixed(2);
 
             var chk_name = 'chk-topcounty-' + fips;
             $chk = $('<input type="checkbox"/>').val(key).attr('name', chk_name).attr('id', chk_name).addClass('form-check-input');
             var row = $table.row.add([fips, $chk.prop('outerHTML'), key,
               cases[n], cases[n]/pop,
               new_cases, new_cases/pop,
-              slope(cases),
+              marginal_slope(cases),
               deaths[n], deaths[n]/pop,
               new_deaths, new_deaths/pop,
-              slope(deaths)
+              marginal_slope(deaths)
             ]).node();
-            case_list.push({code: fips, cases: stats.cases});
+            case_list.push({code: fips, cases: cases[n]});
         }
 
         $table.draw();
