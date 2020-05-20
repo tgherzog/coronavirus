@@ -166,7 +166,9 @@ data['new_cases'] = int(cases[today] - cases[yesterday])
 data['new_deaths'] = int(deaths[today] - deaths[yesterday])
 
 # This is probably not the official national population estimate, but for this purpose it's close enough
-data['states']['USA'] = case_data(cases[date_columns], deaths[date_columns], code='USA', population=int(bg1['population'].sum()), tests=[None]*len(date_columns))
+data['states']['USA'] = case_data(cases[date_columns], deaths[date_columns], code='USA',
+  population=int(bg1['population'].sum()),
+  tests=[None]*len(date_columns), hospitalizations=[None]*len(date_columns))
 
 c2 = c.groupby('Province/State').sum()
 d2 = d.groupby('Province/State').sum()
@@ -174,7 +176,9 @@ d2 = d.groupby('Province/State').sum()
 for key,row in c2.iterrows():
     code = bg1['code'].get(key)
     if code:
-        data['states'][key] = case_data(row[date_columns], d2.loc[key, date_columns], code=code, population=int(bg1['population'].get(key)), tests=[None]*len(date_columns))
+        data['states'][key] = case_data(row[date_columns], d2.loc[key, date_columns], code=code,
+          population=int(bg1['population'].get(key)),
+          tests=[None]*len(date_columns), hospitalizations=[None]*len(date_columns))
 
 for key,row in c.sort_values(today, ascending=False).head(50).iterrows():
     fips = row['FIPS']
@@ -199,11 +203,13 @@ for obj in get_repo_file('csse_covid_19_data/csse_covid_19_daily_reports_us'):
             offset = date_columns_with_century.index(ts)
             dailies = pd.read_csv(obj.download_url).set_index('Province_State')
             data['states']['USA']['tests'][offset] = dailies.sum()['People_Tested']
+            data['states']['USA']['hospitalizations'][offset] = dailies.sum()['People_Hospitalized']
 
             for key,row in dailies.iterrows():
                 code = bg1['code'].get(key)
                 if code:
                     data['states'][key]['tests'][offset] = row['People_Tested']
+                    data['states'][key]['hospitalizations'][offset] = row['People_Hospitalized']
 
 
 with open(os.path.join(options['TARGET_DIR'], 'USA.json'), 'w') as fd:
