@@ -577,6 +577,9 @@ function marginal_value(data, span, n) {
     var sum = 0, i = 0;
     n -= span-1;
     while( i < span ) {
+        if( data[i+n] == null || data[i+n-1] == null )
+            return null;
+
         sum += data[i+n] - data[i+n-1];
         i++;
     }
@@ -600,7 +603,9 @@ function marginal_value_series(data, span, population) {
     // for simple differences, save time by not computing an average
     if( span == 1 ) {
         while( i < data.length ) {
-            result[i] = data[i] - data[i-1];
+            if( data[i] != null && data[i-1] != null )
+                result[i] = (data[i] - data[i-1]) / population;
+
             i++;
         }
     }
@@ -714,7 +719,7 @@ function dataFromOffset(offset) {
     return undefined;
 }
 
-function addTimeSeries(offset, key) {
+function addTimeSeries(offset, key, hidden=false) {
 
     var data = dataFromOffset(offset);
     var type = config[offset].settings.field;
@@ -755,7 +760,8 @@ function addTimeSeries(offset, key) {
             break;
     }
 
-    var n = {label: label, id: key, fill: false, backgroundColor: color, borderColor: color, data: series.slice(1)};
+    var n = {label: label, id: key, fill: false, backgroundColor: color, borderColor: color, hidden: hidden, data: series.slice(1)};
+
     var t = {...n}
     t.label = '-' + t.label;
     t.borderWidth = 1;
@@ -794,9 +800,17 @@ function deleteTimeSeries(offset, key) {
 
 function updateTimeSeries(offset) {
 
+    let ci = config[offset].chart_;
+    var presets = {};
+    for(var i=0;i<config[offset].data.datasets.length;i++) {
+        meta = ci.getDatasetMeta(i);
+        presets[config[offset].data.datasets[i].id] = meta.hidden === null ? ci.data.datasets[i].hidden : meta.hidden;
+    }
+
     config[offset].data.datasets = [];
     $(config[offset].settings.uiContainer + ' input:checked').each(function() {
-        addTimeSeries(offset, $(this).val());
+        let val = $(this).val();
+        addTimeSeries(offset, val, presets[val]);
     });
 
     var field = '';
