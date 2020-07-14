@@ -171,7 +171,7 @@ data['new_cases'] = int(cases[today] - cases[yesterday])
 data['new_deaths'] = int(deaths[today] - deaths[yesterday])
 
 # This is probably not the official national population estimate, but for this purpose it's close enough
-data['states']['USA'] = case_data(cases[date_columns], deaths[date_columns], code='USA', admin=0,
+data['states']['USA'] = case_data(cases[date_columns], deaths[date_columns], code='USA', fips='00', admin=0,
   population=int(bg1['population'].sum()),
   tests=[None]*len(date_columns), hospitalizations=[None]*len(date_columns))
 
@@ -180,8 +180,9 @@ d2 = d.groupby('Province/State').sum()
 
 for key,row in c2.iterrows():
     code = bg1['code'].get(key)
+    fips = bg1['id'].get(key)
     if code:
-        data['states'][key] = case_data(row[date_columns], d2.loc[key, date_columns], code=code, admin=1,
+        data['states'][key] = case_data(row[date_columns], d2.loc[key, date_columns], code=code, fips=fips, admin=1,
           population=int(bg1['population'].get(key)),
           tests=[None]*len(date_columns), hospitalizations=[None]*len(date_columns))
 
