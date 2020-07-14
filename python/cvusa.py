@@ -120,6 +120,11 @@ def add_century(x):
     month,day,year = x.split('/',maxsplit=2)
     return '/'.join([month, day, str(int(year)+2000)])
 
+def nan_to_none(x):
+
+    return None if np.isnan(x) else x
+    
+
 confirmed_url, deaths_url, recovery_url, last_modified = csse_refs('usa')
 
 c = get_covid_frame(confirmed_url, True)
@@ -208,8 +213,8 @@ for obj in get_repo_file('csse_covid_19_data/csse_covid_19_daily_reports_us'):
             for key,row in dailies.iterrows():
                 code = bg1['code'].get(key)
                 if code:
-                    data['states'][key]['tests'][offset] = row['People_Tested']
-                    data['states'][key]['hospitalizations'][offset] = row['People_Hospitalized']
+                    data['states'][key]['tests'][offset] = nan_to_none(row['People_Tested'])
+                    data['states'][key]['hospitalizations'][offset] = nan_to_none(row['People_Hospitalized'])
 
 
 with open(os.path.join(options['TARGET_DIR'], 'USA.json'), 'w') as fd:
