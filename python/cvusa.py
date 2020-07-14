@@ -171,7 +171,7 @@ data['new_cases'] = int(cases[today] - cases[yesterday])
 data['new_deaths'] = int(deaths[today] - deaths[yesterday])
 
 # This is probably not the official national population estimate, but for this purpose it's close enough
-data['states']['USA'] = case_data(cases[date_columns], deaths[date_columns], code='USA',
+data['states']['USA'] = case_data(cases[date_columns], deaths[date_columns], code='USA', admin=0,
   population=int(bg1['population'].sum()),
   tests=[None]*len(date_columns), hospitalizations=[None]*len(date_columns))
 
@@ -181,7 +181,7 @@ d2 = d.groupby('Province/State').sum()
 for key,row in c2.iterrows():
     code = bg1['code'].get(key)
     if code:
-        data['states'][key] = case_data(row[date_columns], d2.loc[key, date_columns], code=code,
+        data['states'][key] = case_data(row[date_columns], d2.loc[key, date_columns], code=code, admin=1,
           population=int(bg1['population'].get(key)),
           tests=[None]*len(date_columns), hospitalizations=[None]*len(date_columns))
 
@@ -197,7 +197,7 @@ for key,row in c.sort_values(today, ascending=False).head(50).iterrows():
         admin2 = row['Admin2']
         addr = '{}/{}'.format(admin2, code)
 
-    data['counties'][addr] = case_data(row[date_columns], d.loc[key, date_columns], fips=fips, county=admin2, state=row['Province/State'], state_abbr=code, population=safe_cast(bg2['population'].get(fips, None)))
+    data['counties'][addr] = case_data(row[date_columns], d.loc[key, date_columns], fips=fips, county=admin2, state=row['Province/State'], state_abbr=code, admin=2, population=safe_cast(bg2['population'].get(fips, None)))
     
 # cycle through the daily files and add test data - eventually could add hospitalizations
 for obj in get_repo_file('csse_covid_19_data/csse_covid_19_daily_reports_us'):
@@ -239,7 +239,7 @@ for key,row in c2.iterrows():
             fips = v['FIPS']
             admin2 = v['Admin2']
             addr = '{}/{}'.format(admin2, code)
-            state_data['counties'][addr] = case_data(v[date_columns], d.loc[k, date_columns], fips=fips, county=admin2, population=safe_cast(bg2['population'].get(fips, None)))
+            state_data['counties'][addr] = case_data(v[date_columns], d.loc[k, date_columns], fips=fips, county=admin2, admin=2, population=safe_cast(bg2['population'].get(fips, None)))
 
         with open(os.path.join(options['TARGET_DIR'], code + '.json'), 'w') as fd:
             json.dump(state_data, fd)
