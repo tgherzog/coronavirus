@@ -431,7 +431,7 @@ config = [
     },
     settings: {
       perCapita: false,
-      type: 'cases'
+      type: 'new_cases'
     },
     chart_: null
   },
@@ -623,6 +623,7 @@ function updateTodayChart() {
 
     var labels = [];
     var today = [];
+    var colors = [];
     var offset = 4;
     var label = '';
     var pc = config[offset].settings.perCapita ? '/1,000' : '';
@@ -631,6 +632,7 @@ function updateTodayChart() {
             var cases = data['states'][key]['cases'];
             var deaths = data['states'][key]['deaths'];
             var tests = data['states'][key]['tests'];
+            var color = data['states'][key]['lineColor'];
             n = cases.length - 1;
             if( config[offset].settings.perCapita ) {
                 population = data['states'][key]['population'] / 1000;
@@ -682,7 +684,7 @@ function updateTodayChart() {
                     break;
             }
 
-            today.push({label: key, value: obs});
+            today.push({label: key, value: obs, color: color});
         }
     }
 
@@ -691,6 +693,7 @@ function updateTodayChart() {
     config[offset].data.labels = today.map(x => x.label);
     config[offset].data.datasets[0].data = today.map(x => x.value);
     config[offset].data.datasets[0].label = label2;
+    config[offset].data.datasets[0].backgroundColor = today.map(x => x.color);
     config[offset].options.scales.yAxes[0].scaleLabel.labelString = label;
 
     if( config[offset].settings.type == 'avg_growth' || config[offset].settings.type == 'cfr' ) {
