@@ -628,7 +628,7 @@ function updateTodayChart() {
     var label = '';
     var pc = config[offset].settings.perCapita ? '/1,000' : '';
     for(var key in data['states']) {
-        if( key != 'USA' ) {
+        if( data['states'][key]['admin'] == 1 ) {
             var cases = data['states'][key]['cases'];
             var deaths = data['states'][key]['deaths'];
             var tests = data['states'][key]['tests'];
@@ -732,8 +732,6 @@ function addTimeSeries(offset, key, hidden=false) {
     var population = 1;
     var label = offset == 1 ? data[key].county : key;
     var seriesType = config[offset].settings.aggregation;
-
-    data = dataFromOffset(offset);
 
     if( config[offset].settings.perCapita ) {
         population = data[key]['population'] / 1000;
@@ -867,9 +865,16 @@ function updateState(state, updateMenu) {
     updateBadges(state, '#banner-state-cases', '#banner-state-deaths');
 
     var code = data['states'][state]['code'];
+    var stateRow = data['states'][state];
+    stateRow['county'] = state;
+
     document.cookie = 'usState=' + state + '; expires=Tue, 31 Dec 2024 00:00 UTC';
     $.get(apiRoot + code + '.json', function(data) {
         stateData = data;
+        
+        // splice in the state-level data so that appears as well
+        stateData['counties'][code] = stateRow;
+
         $table = $('#county-table').DataTable();
         var sorter = $table.order()[0];
         $table.clear();
@@ -892,8 +897,11 @@ function updateState(state, updateMenu) {
                 new_deaths, per_capita(new_deaths, pop),
                 marginal_slope(row.deaths)
             ];
-            $table.row.add(elems);
-            case_list.push({code: row.fips, cases: elems[sorter[0]]});
+            var row_ = $table.row.add(elems).node();
+            if( row['admin'] == 1 )
+                $(row_).addClass('aggregate');
+            else
+                case_list.push({code: row.fips, cases: elems[sorter[0]]});
         }
 
         $table.draw();
@@ -975,9 +983,8 @@ function initialize() {
               new_deaths, new_deaths/pop,
               marginal_slope(deaths)
             ]).node();
-            if( key == 'USA' ) {
+            if( data['states'][key]['admin'] == 0 )
                 $(row).addClass('aggregate');
-            }
             else {
                 case_list.push({code: code, cases: cases[n], tests: tests[n]});
                 $opt = $('<option/>').val(key).attr('selected', key == default_state).text(key);
@@ -988,7 +995,7 @@ function initialize() {
             var row = $tests.row.add([code, $chk.prop('outerHTML'), key,
               tests[n], tests[n]/pop, cases[n]/tests[n]
             ]).node();
-            if( key == 'USA' )
+            if( data['states'][key]['admin'] == 0 )
               $(row).addClass('aggregate');
         }
 
@@ -1081,9 +1088,17 @@ function initialize() {
 
 function autoCheck(id, offset, n) {
 
+    var nRows = 0;
     $('#' + id + '-table').DataTable().rows().every(function(idx, tableLoop, rowLoop) {
         var code = this.data()[0];
-        $('#chk-' + id + '-' + code).prop('checked', rowLoop < n);
+        var identifier = '#chk-' + id + '-' + code;
+        var isAggregate = $(identifier).closest('tr').hasClass('aggregate');
+        if( !isAggregate && nRows < n ) {
+            $(identifier).prop('checked', true);
+            nRows++;
+        } 
+        else
+            $(identifier).prop('checked', false);
     });
 
     updateTimeSeries(offset);
