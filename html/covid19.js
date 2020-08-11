@@ -889,7 +889,7 @@ function updateState(state, updateMenu) {
             i = row.cases.length - 1;
             var new_cases = row.cases[i] - row.cases[i-1], new_deaths = row.deaths[i] - row.deaths[i-1];
             $chk = tableCheckbox(key, 'chk-county-' + row.fips);
-            var elems = [ row.fips, $chk.prop('outerHTML'), row.county,
+            var elems = [ row.fips, $chk.prop('outerHTML'), 99, row.county,
                 row.cases[i], per_capita(row.cases[i], pop),
                 new_cases, per_capita(new_cases, pop),
                 marginal_slope(row.cases),
@@ -975,7 +975,7 @@ function initialize() {
             var new_deaths = deaths[n] - deaths[n-1];
 
             $chk = tableCheckbox(key, 'chk-state-' + code);
-            var row = $table.row.add([code, $chk.prop('outerHTML'), key,
+            var row = $table.row.add([code, $chk.prop('outerHTML'), 99, key,
               cases[n], cases[n]/pop,
               new_cases, new_cases/pop,
               marginal_slope(cases),
@@ -992,7 +992,7 @@ function initialize() {
             }
 
             $chk = tableCheckbox(key, 'chk-tests-' + code);
-            var row = $tests.row.add([code, $chk.prop('outerHTML'), key,
+            var row = $tests.row.add([code, $chk.prop('outerHTML'), 99, key,
               tests[n], tests[n]/pop, cases[n]/tests[n]
             ]).node();
             if( data['states'][key]['admin'] == 0 )
@@ -1057,7 +1057,7 @@ function initialize() {
 
             var chk_name = 'chk-topcounty-' + fips;
             $chk = $('<input type="checkbox"/>').val(key).attr('name', chk_name).attr('id', chk_name).addClass('form-check-input');
-            var row = $table.row.add([fips, $chk.prop('outerHTML'), key,
+            var row = $table.row.add([fips, $chk.prop('outerHTML'), 99, key,
               cases[n], cases[n]/pop,
               new_cases, new_cases/pop,
               marginal_slope(cases),
@@ -1112,7 +1112,7 @@ function tableParams(id, offset) {
       autoWidth: false,
       searching: true,
       info: false,
-      order: [[ 3, 'desc' ]],
+      order: [[ 4, 'desc' ]],
       dom: 'Bfrtip',
       buttons: [
         { text: 'Top 5',
@@ -1128,29 +1128,30 @@ function tableParams(id, offset) {
       columnDefs: [
           {
             orderable: false,
-            targets: 1
+            searchable: false,
+            targets: [1, 2]
           },
           {
             render: function(data) {
                 return formatters.number(data)
             },
-            targets: [3, 5, 8, 10]
+            targets: [4, 6, 9, 11]
           },
           {
             render: function(data) {
                 return data.toFixed(3)
             },
-            targets: [4, 6, 9, 11]
+            targets: [5, 7, 10, 12]
           },
           {
             render: function(data) {
                 return data.toFixed(2)
             },
-            targets: [7, 12]
+            targets: [8, 13]
           },
           {
             visible: false,
-            targets: [0, 8, 9, 10, 11, 12]
+            targets: [0, 9, 10, 11, 12, 13]
           }
       ]
     };
@@ -1167,7 +1168,7 @@ $(document).ready(function() {
       autoWidth: false,
       searching: true,
       info: false,
-      order: [[ 3, 'desc' ]],
+      order: [[ 4, 'desc' ]],
       dom: 'Bfrtip',
       buttons: [
         { text: 'Top 5',  action: function() { autoCheck('tests', 3,  5) } },
@@ -1181,27 +1182,49 @@ $(document).ready(function() {
           },
           {
             orderable: false,
-            targets: 1
+            searchable: false,
+            targets: [1, 2]
           },
           {
             render: function(data) {
                 return formatters.number(data)
             },
-            targets: 3
+            targets: 4
           },
           {
             render: function(data) {
                 return data.toFixed(3);
             },
-            targets: 4
+            targets: 5
           },
           {
             render: function(data) {
                 return formatters.pct_label(data);
             },
-            targets: 5
+            targets: 6
           }
       ]
+    });
+
+    /* 3rd column (offset=2) is a rank-order column which we draw regardless of value or row
+       order. Normally the i parameter could simply be drawn as is, but we don't want to
+       include the aggregate row in the rank order so we maintain a separate counter
+    */
+    $('table.table-cases').each(function() {
+      var t = $(this).DataTable();
+      t.on('order.dt search.dt', function() {
+        var counter = 0;
+        t.column(2, {search: 'applied', order: 'applied'}).nodes().each(function(cell, i) {
+            var isAggregate = $(cell).closest('tr').hasClass('aggregate');
+            if( isAggregate ) {
+                cell.innerHTML = '';
+            }
+            else {
+                cell.innerHTML = counter+1;
+                counter++;
+            }
+        });
+      }).draw();
     });
 
     $('input.logscale').change(function() {
@@ -1247,11 +1270,11 @@ $(document).ready(function() {
         }
         else {
             $table = $(config[offset].settings.uiContainer).DataTable();
-            for(var i=3;i<13;i++) {
+            for(var i=4;i<14;i++) {
                 if( parts[0] == 'cases' )
-                    $table.column(i).visible(i<8);
+                    $table.column(i).visible(i<9);
                 else
-                    $table.column(i).visible(i>=8);
+                    $table.column(i).visible(i>=9);
             }
             $table.draw();
         }

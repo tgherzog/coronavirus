@@ -17,7 +17,7 @@ h1 span.glyphicon-info-sign {
   margin: 12px 0;
 }
   
-.chart-wrapper {
+.chart-wrapper, .nav-tabs {
   user-select: none;
   -webkit-user-select: none;
 }
@@ -106,8 +106,12 @@ table.table-cases th, table.table-cases td {
   text-align: right;
 }
 
-table.table-cases th:nth-child(1), table.table-cases td:nth-child(1), table.table-cases.check-table th:nth-child(2), table.table-cases.check-table td:nth-child(2) {
+table.table-cases th:nth-child(1), table.table-cases td:nth-child(1), table.table-cases.check-table th:nth-child(3), table.table-cases.check-table td:nth-child(3) {
   text-align: left;
+}
+
+table.table-cases.check-table th:nth-child(2), table.table-cases.check-table td:nth-child(2) {
+  text-align: center;
 }
 
 .state-abbr {
