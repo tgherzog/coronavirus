@@ -657,10 +657,20 @@ function updateTodayChart() {
                     label = 'New Cases' + pc;
                     label2 = label;
                     break;
+                case 'avg_new_cases':
+                    obs = marginal_value(cases, rollingLen) / population;
+                    label = 'New Cases' + pc;
+                    label2 = 'Avg. Daily Cases' + pc;
+                    break;
                 case 'new_deaths':
                     obs = (deaths[n] - deaths[n-1]) / population;
                     label = 'New Deaths' + pc;
                     label2 = label;
+                    break;
+                case 'avg_new_deaths':
+                    obs = marginal_value(deaths, rollingLen) / population;
+                    label = 'New Deaths' + pc;
+                    label2 = 'Avg. Daily Deaths' + pc;
                     break;
                 case 'avg_growth':
                     obs = marginal_slope(cases);
@@ -889,13 +899,15 @@ function updateState(state, updateMenu) {
             i = row.cases.length - 1;
             var new_cases = row.cases[i] - row.cases[i-1], new_deaths = row.deaths[i] - row.deaths[i-1];
             $chk = tableCheckbox(key, 'chk-county-' + row.fips);
+            avg_cases = marginal_value(row.cases, rollingLen);
+            avg_deaths = marginal_value(row.deaths, rollingLen);
             var elems = [ row.fips, $chk.prop('outerHTML'), 99, row.county,
                 row.cases[i], per_capita(row.cases[i], pop),
                 new_cases, per_capita(new_cases, pop),
-                marginal_slope(row.cases),
+                avg_cases, per_capita(avg_cases, pop),
                 row.deaths[i], per_capita(row.deaths[i], pop),
                 new_deaths, per_capita(new_deaths, pop),
-                marginal_slope(row.deaths)
+                avg_deaths, per_capita(avg_deaths, pop)
             ];
             var row_ = $table.row.add(elems).node();
             if( row['admin'] == 1 )
@@ -969,19 +981,21 @@ function initialize() {
             var tests = data['states'][key]['tests'];
             var n = cases.length - 1;
             var code = data['states'][key]['code'];
-            var pop = data['states'][key]['population']/1000;
+            var pop = data['states'][key]['population'];
 
             var new_cases = cases[n] - cases[n-1];
             var new_deaths = deaths[n] - deaths[n-1];
 
             $chk = tableCheckbox(key, 'chk-state-' + code);
+            avg_cases = marginal_value(cases, rollingLen);
+            avg_deaths = marginal_value(deaths, rollingLen);
             var row = $table.row.add([code, $chk.prop('outerHTML'), 99, key,
               cases[n], cases[n]/pop,
-              new_cases, new_cases/pop,
-              marginal_slope(cases),
-              deaths[n], deaths[n]/pop,
-              new_deaths, new_deaths/pop,
-              marginal_slope(deaths)
+              new_cases, per_capita(new_cases, pop),
+              avg_cases, per_capita(avg_cases, pop),
+              deaths[n], per_capita(deaths[n], pop),
+              new_deaths, per_capita(new_deaths, pop),
+              avg_deaths, per_capita(avg_deaths, pop)
             ]).node();
             if( data['states'][key]['admin'] == 0 )
                 $(row).addClass('aggregate');
@@ -1050,20 +1064,22 @@ function initialize() {
             var st_name = data['counties'][key]['state']
             var cty_name = data['counties'][key]['county']
             var fips = data['counties'][key]['fips']
-            var pop = data['counties'][key]['population']/1000;
+            var pop = data['counties'][key]['population'];
 
             var new_cases = cases[n] - cases[n-1];
             var new_deaths = deaths[n] - deaths[n-1];
 
             var chk_name = 'chk-topcounty-' + fips;
             $chk = $('<input type="checkbox"/>').val(key).attr('name', chk_name).attr('id', chk_name).addClass('form-check-input');
+            avg_cases = marginal_value(cases, rollingLen);
+            avg_deaths = marginal_value(deaths, rollingLen);
             var row = $table.row.add([fips, $chk.prop('outerHTML'), 99, key,
-              cases[n], cases[n]/pop,
-              new_cases, new_cases/pop,
-              marginal_slope(cases),
-              deaths[n], deaths[n]/pop,
-              new_deaths, new_deaths/pop,
-              marginal_slope(deaths)
+              cases[n], per_capita(cases[n], pop),
+              new_cases, per_capita(new_cases, pop),
+              avg_cases, per_capita(avg_cases, pop),
+              deaths[n], per_capita(deaths[n], pop),
+              new_deaths, per_capita(new_deaths, pop),
+              avg_deaths, per_capita(avg_deaths, pop)
             ]).node();
             case_list.push({code: fips, cases: cases[n]});
         }
@@ -1107,6 +1123,24 @@ function autoCheck(id, offset, n) {
 
 function tableParams(id, offset) {
 
+    /* Column layout:
+       0:  ID (never visible)
+       1:  selection checkbox
+       2:  rank order (auto display)
+       3:  state/county name
+       4:  total cases
+       5:  cases/capita
+       6:  new cases
+       7   new cases/capita
+       8:  rolling average cases
+       9:  rolling average cases/capita
+       10: total deaths
+       11: deaths/capita
+       12: new deaths
+       13: new deaths/capita
+       14: rolling average deaths
+       15: rolling average cases/capita
+    */
     return {
       paging: false,
       autoWidth: false,
@@ -1132,26 +1166,30 @@ function tableParams(id, offset) {
             targets: [1, 2]
           },
           {
+            /* new/daily/avercase cases */
             render: function(data) {
                 return formatters.number(data)
             },
-            targets: [4, 6, 9, 11]
+            targets: [4, 6, 8, 10, 12, 14]
           },
           {
+            /* all per capitas */
             render: function(data) {
                 return data.toFixed(3)
             },
-            targets: [5, 7, 10, 12]
+            targets: [5, 7, 9, 11, 13, 15]
           },
+          /* discontinued: trends
           {
             render: function(data) {
                 return data.toFixed(2)
             },
             targets: [8, 13]
           },
+          */
           {
             visible: false,
-            targets: [0, 9, 10, 11, 12, 13]
+            targets: [0, 10, 11, 12, 13, 14, 15]
           }
       ]
     };
