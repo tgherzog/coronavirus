@@ -990,7 +990,7 @@ function initialize() {
             avg_cases = marginal_value(cases, rollingLen);
             avg_deaths = marginal_value(deaths, rollingLen);
             var row = $table.row.add([code, $chk.prop('outerHTML'), 99, key,
-              cases[n], cases[n]/pop,
+              cases[n], per_capita(cases[n], pop),
               new_cases, per_capita(new_cases, pop),
               avg_cases, per_capita(avg_cases, pop),
               deaths[n], per_capita(deaths[n], pop),
