@@ -208,13 +208,17 @@ for obj in get_repo_file('csse_covid_19_data/csse_covid_19_daily_reports_us'):
         if ts in date_columns_with_century:
             offset = date_columns_with_century.index(ts)
             dailies = pd.read_csv(obj.download_url).set_index('Province_State')
-            data['states']['USA']['tests'][offset] = dailies.sum()['People_Tested']
+            if 'People_Tested' in dailies:
+                data['states']['USA']['tests'][offset] = dailies.sum()['People_Tested']
+
             data['states']['USA']['hospitalizations'][offset] = dailies.sum()['People_Hospitalized']
 
             for key,row in dailies.iterrows():
                 code = bg1['code'].get(key)
                 if code:
-                    data['states'][key]['tests'][offset] = nan_to_none(row['People_Tested'])
+                    if 'People_Tested' in row:
+                        data['states'][key]['tests'][offset] = nan_to_none(row['People_Tested'])
+
                     data['states'][key]['hospitalizations'][offset] = nan_to_none(row['People_Hospitalized'])
 
 
