@@ -150,6 +150,14 @@ function trendline(data, labels) {
 }
 
 
+function formatYAxisTick(offset, value) {
+
+    if( config[offset].settings.aggregation == 'ptr' || config[offset].settings.aggregation == 'cfr' )
+        return formatters.pct_label(value);
+
+    return formatCaseValue(value, offset);
+}
+
 function formatCaseValue(value, idx) {
 
   return formatters.number(value, config[idx].settings.perCapita ? 2 : 0);
@@ -161,6 +169,11 @@ function per_capita(value, pop) {
         return 0;
 
     return value / (pop/1000);
+}
+
+function tot(series, n) {
+    
+    return series[n] - (baseline == undefined ? 0 : series[baseline]);
 }
 
 function getCookie(cname, otherwise) {
@@ -221,7 +234,7 @@ config = [
           ticks: {
             maxTicksLimit: 5,
             callback: function(value, index, values) {
-              return formatCaseValue(value, 0);
+              return formatYAxisTick(0, value);
             }
           }
         }]
@@ -264,7 +277,7 @@ config = [
           ticks: {
             maxTicksLimit: 5,
             callback: function(value, index, values) {
-              return formatCaseValue(value, 1);
+              return formatYAxisTick(1, value);
             }
           }
         }]
@@ -307,7 +320,7 @@ config = [
           ticks: {
             maxTicksLimit: 5,
             callback: function(value, index, values) {
-              return formatCaseValue(value, 2);
+              return formatYAxisTick(2, value);
             }
           }
         }]
@@ -350,10 +363,7 @@ config = [
           ticks: {
             maxTicksLimit: 5,
             callback: function(value, index, values) {
-              if( config[3].settings.aggregation == 'ptr' )
-                return formatters.pct_label(value)
-
-              return formatCaseValue(value, 3);
+              return formatYAxisTick(3, value);
             }
           }
         }]
@@ -470,7 +480,7 @@ config = [
           ticks: {
             maxTicksLimit: 5,
             callback: function(value, index, values) {
-              return formatCaseValue(value, 5);
+              return formatYAxisTick(5, value);
             }
           }
         }]
@@ -568,6 +578,7 @@ apiRoot = 'http://cvapi.zognet.net/v2/USA/';
 data = {}
 stateData = {}
 dayOffset = 1;  // offset of data that we actually display - ignoring early dates that are less significant
+baseline = undefined;
 
 function marginal_value(data, span, n) {
 
@@ -678,7 +689,7 @@ function updateTodayChart() {
                     label2 = label;
                     break;
                 case 'cfr':
-                    obs = deaths[n] / cases[n];
+                    obs = tot(deaths, n) / tot(cases, n);
                     label = 'Case Fatality Rate';
                     label2 = 'CFR';
                     break;
@@ -688,7 +699,7 @@ function updateTodayChart() {
                     label2 = label;
                     break;
                 case 'ptr':
-                    obs = cases[n] / tests[n];
+                    obs = tot(cases, n) / tot(tests, n);
                     label = 'Positive Test Rate';
                     label2 = 'PTR';
                     break;
@@ -747,6 +758,9 @@ function addTimeSeries(offset, key, hidden=false) {
         population = data[key]['population'] / 1000;
     }
 
+    // grab the base value before we slice up the array
+    var base  = baseline == undefined ? 0 : data[key][type][baseline];
+
     // here we grab 1 prior value so we can calculate 'new' cases if necessary. Then we start indexing from 1
     var data_ = data[key][type].slice(dayOffset-1);
     switch(seriesType) {
@@ -754,7 +768,7 @@ function addTimeSeries(offset, key, hidden=false) {
             series = data_;
             for(var i=0;i<series.length;i++)
                 if( series[i] !== null )
-                    series[i] /= population;
+                    series[i] = (series[i] - base) / population;
 
             break;
         case 'new':
@@ -765,9 +779,17 @@ function addTimeSeries(offset, key, hidden=false) {
             break;
         case 'ptr':
             series = data_;
+            var baseCases = baseline == undefined ? 0 : data[key]['cases'][baseline];
             var cases = data[key]['cases'].slice(dayOffset-1);
             for(var i=0;i<series.length;i++)
-                series[i] = cases[i] / series[i];
+                series[i] = (cases[i] - baseCases) / (series[i] - base);
+            break;
+        case 'cfr':
+            series = data_;
+            var baseDeaths = baseline == undefined ? 0 : data[key]['deaths'][baseline];
+            var deaths = data[key]['deaths'].slice(dayOffset-1);
+            for(var i=0;i<series.length;i++)
+                series[i] = (deaths[i] - baseDeaths) / (series[i] - base);
             break;
     }
 
@@ -827,6 +849,8 @@ function updateTimeSeries(offset) {
     var field = '';
     if( config[offset].settings.aggregation == 'ptr' )
         field = 'Positive Test Rate';
+    else if( config[offset].settings.aggregation == 'cfr' )
+        field = 'Case Fatality Rate';
     else {
         var agg = config[offset].settings.aggregation == 'total' ? 'total' : 'new';
         field = capitalize(agg) + ' ' + capitalize(config[offset].settings.field);
@@ -844,12 +868,12 @@ function updateBadges(state, caseID, deathsID) {
     var deaths = data['states'][state]['deaths'];
     var n = cases.length;
 
-    $(caseID).find('.total').text(formatters.number(cases[n-1]));
+    $(caseID).find('.total').text(formatters.number(tot(cases, n-1)));
     $(caseID).find('.new').text(formatters.number(marginal_value(cases)));
     $(caseID).find('.avg').text(formatters.number(marginal_value(cases, rollingLen)));
     $(caseID).find('.trend').text(formatters.number(marginal_slope(cases).toFixed(0), 0, true));
 
-    $(deathsID).find('.total').text(formatters.number(deaths[n-1]));
+    $(deathsID).find('.total').text(formatters.number(tot(deaths, n-1)));
     $(deathsID).find('.new').text(formatters.number(marginal_value(deaths)));
     $(deathsID).find('.avg').text(formatters.number(marginal_value(deaths, rollingLen)));
     $(deathsID).find('.trend').text(formatters.number(marginal_slope(deaths).toFixed(0), 0, true));
@@ -902,10 +926,10 @@ function updateState(state, updateMenu) {
             avg_cases = marginal_value(row.cases, rollingLen);
             avg_deaths = marginal_value(row.deaths, rollingLen);
             var elems = [ row.fips, $chk.prop('outerHTML'), 99, row.county,
-                row.cases[i], per_capita(row.cases[i], pop),
+                tot(row.cases, i), per_capita(tot(row.cases, i), pop),
                 new_cases, per_capita(new_cases, pop),
                 avg_cases, per_capita(avg_cases, pop),
-                row.deaths[i], per_capita(row.deaths[i], pop),
+                tot(row.deaths, i), per_capita(tot(row.deaths, i), pop),
                 new_deaths, per_capita(new_deaths, pop),
                 avg_deaths, per_capita(avg_deaths, pop)
             ];
@@ -952,17 +976,30 @@ function initialize() {
         qs = new Querystring();
         trendLen = qs.get('trend', trendLen, true);
         rollingLen = qs.get('rolling', rollingLen, true);
+        if( qs.get('since') ) {
+            var d = qs.get('since').split('/');
+            if( d.length >= 2 ) {
+                if( d.length == 2 ) d.push('2020');  // hopefully this won't last much longer, otherwise, might want to revisit the 2020 assumption
+                var t = data_.days.indexOf(d.join('/'));
+                if( t > 0 ) {
+                    dayOffset = t;
+                    baseline = dayOffset - 1;
+                }
+            }
+        }
+        else {
+            // otherwise, the default is to start where the national case load exceeds 25, which is 2/29/2020
+            dayOffset = 0;
+            while( dayOffset < data['states']['USA']['cases'].length && data['states']['USA']['cases'][dayOffset] < 25 )
+                dayOffset++;
+        }
+
         $('span.trendlen').text(trendLen.toString());
         $('span.rolling').text(rollingLen.toString());
 
         var d = new Date(data['update_date_epoch'] * 1000);
         $('#updated').text(d.toLocaleString());
         $('#newdate').text(data['most_recent_day']);
-
-        // ignore dates that have less than 25 cases, which just happens to be all of February
-        dayOffset = 0;
-        while( dayOffset < data['states']['USA']['cases'].length && data['states']['USA']['cases'][dayOffset] < 25 )
-            dayOffset++;
 
         var i = 0, case_list = [];
         for(i=0;i<4;i++)
@@ -990,10 +1027,10 @@ function initialize() {
             avg_cases = marginal_value(cases, rollingLen);
             avg_deaths = marginal_value(deaths, rollingLen);
             var row = $table.row.add([code, $chk.prop('outerHTML'), 99, key,
-              cases[n], per_capita(cases[n], pop),
+              tot(cases, n), per_capita(tot(cases, n), pop),
               new_cases, per_capita(new_cases, pop),
               avg_cases, per_capita(avg_cases, pop),
-              deaths[n], per_capita(deaths[n], pop),
+              tot(deaths, n), per_capita(tot(deaths, n), pop),
               new_deaths, per_capita(new_deaths, pop),
               avg_deaths, per_capita(avg_deaths, pop)
             ]).node();
@@ -1074,10 +1111,10 @@ function initialize() {
             avg_cases = marginal_value(cases, rollingLen);
             avg_deaths = marginal_value(deaths, rollingLen);
             var row = $table.row.add([fips, $chk.prop('outerHTML'), 99, key,
-              cases[n], per_capita(cases[n], pop),
+              tot(cases, n), per_capita(tot(cases, n), pop),
               new_cases, per_capita(new_cases, pop),
               avg_cases, per_capita(avg_cases, pop),
-              deaths[n], per_capita(deaths[n], pop),
+              tot(deaths, n), per_capita(tot(deaths, n), pop),
               new_deaths, per_capita(new_deaths, pop),
               avg_deaths, per_capita(avg_deaths, pop)
             ]).node();
