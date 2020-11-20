@@ -1308,11 +1308,11 @@ $(document).ready(function() {
         }
         else {
             $table = $(config[offset].settings.uiContainer).DataTable();
-            for(var i=4;i<14;i++) {
+            for(var i=4;i<16;i++) {
                 if( parts[0] == 'cases' )
-                    $table.column(i).visible(i<9);
+                    $table.column(i).visible(i<10);
                 else
-                    $table.column(i).visible(i>=9);
+                    $table.column(i).visible(i>=10);
             }
             $table.draw();
         }
