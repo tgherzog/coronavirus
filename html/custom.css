@@ -17,7 +17,7 @@ h1 span.glyphicon-info-sign {
   margin: 12px 0;
 }
   
-.chart-wrapper, .nav-tabs {
+.chart-wrapper, .nav-tabs, .covid-banner {
   user-select: none;
   -webkit-user-select: none;
 }
