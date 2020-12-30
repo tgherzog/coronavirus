@@ -35,16 +35,9 @@ formatters = {
     number: function(value, dp=0, plus=false) {
           if( value == undefined ) return '';
 
+          value = Number(value);
           prefix = (plus && value > 0) ? '+' : '';
-          var a = parseInt(value)
-          var b = Math.abs(value - a);
-
-          a = a.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-
-          if( dp > 0 )
-            return prefix + a + b.toFixed(dp).substr(1);
-
-          return a;
+          return value.toFixed(dp);
     },
 
     rank: function(items, data) {
