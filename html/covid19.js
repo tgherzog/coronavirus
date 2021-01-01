@@ -36,8 +36,10 @@ formatters = {
           if( value == undefined ) return '';
 
           value = Number(value);
-          prefix = (plus && value > 0) ? '+' : '';
-          return value.toFixed(dp);
+          var prefix = (plus && value > 0) ? '+' : '';
+          var components = value.toFixed(dp).split('.');
+          components[0] = components[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+          return components.join('.');
     },
 
     rank: function(items, data) {
