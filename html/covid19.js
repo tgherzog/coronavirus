@@ -81,7 +81,7 @@ formatters = {
       else
           type = config[offset].settings.aggregation;
             
-      if( type == 'ptr' || type == 'cfr' )
+      if( type == 'ptr' || type == 'cfr' || type == 'adr' )
         value = (item.yLabel*100).toFixed(2) + '%';
       else if( type == 'avg_growth' )
         value = formatters.number(item.yLabel, 2);
@@ -147,7 +147,7 @@ function trendline(data, labels) {
 
 function formatYAxisTick(offset, value) {
 
-    if( config[offset].settings.aggregation == 'ptr' || config[offset].settings.aggregation == 'cfr' )
+    if( config[offset].settings.aggregation == 'ptr' || config[offset].settings.aggregation == 'cfr'  || config[offset].settings.aggregation == 'adr' )
         return formatters.pct_label(value);
 
     return formatCaseValue(value, offset);
@@ -340,7 +340,7 @@ config = [
     chart_: null
   },
 
-  // testing tab - unified chart
+  // vaccines tab - unified chart
   {
     type: 'line',
     data: {
@@ -353,7 +353,7 @@ config = [
           type: 'linear',
           scaleLabel: {
             display: true,
-            labelString: 'Tests'
+            labelString: 'Vaccines'
           },
           ticks: {
             maxTicksLimit: 5,
@@ -375,10 +375,10 @@ config = [
       }
     },
     settings: {
-        field: 'tests',
+        field: 'vaccines_distributed',
         perCapita: false,
         aggregation: 'total',
-        uiContainer: '#tests-table'
+        uiContainer: '#vaccines-table'
     },
     chart_: null
   },
@@ -415,6 +415,7 @@ config = [
               switch(type) {
                 case 'cfr':
                 case 'ptr':
+                case 'adr':
                     return formatters.pct_label(value);
               }
 
@@ -637,9 +638,11 @@ function updateTodayChart() {
         if( data['states'][key]['admin'] == 1 ) {
             var cases = data['states'][key]['cases'];
             var deaths = data['states'][key]['deaths'];
-            var tests = data['states'][key]['tests'];
+            var vDist  = data['states'][key]['vaccines_distributed'];
+            var vAdmin = data['states'][key]['vaccines_administered'];
             var color = data['states'][key]['lineColor'];
             n = cases.length - 1;
+            vn = data['most_recent_vaccine_day_offset'];
             if( config[offset].settings.perCapita ) {
                 population = data['states'][key]['population'] / 1000;
             }
@@ -688,15 +691,20 @@ function updateTodayChart() {
                     label = 'Case Fatality Rate';
                     label2 = 'CFR';
                     break;
-                case 'tests':
-                    obs = tests[n] / population;
-                    label = 'Tests' + pc;
-                    label2 = label;
+                case 'dist_doses':
+                    obs = vDist[vn] / population;
+                    label = 'Distributed Vaccine Doses' + pc;
+                    label2 = 'Doses' + pc;
                     break;
-                case 'ptr':
-                    obs = tot(cases, n) / tot(tests, n);
-                    label = 'Positive Test Rate';
-                    label2 = 'PTR';
+                case 'admin_doses':
+                    obs = vAdmin[vn] / population;
+                    label = 'Administered Vaccine Doses' + pc;
+                    label2 = 'Doses' + pc;
+                    break;
+                case 'adr':
+                    obs = vAdmin[vn] / vDist[vn];
+                    label = 'Administered Vaccine Doses' + pc;
+                    label2 = 'Doses' + pc;
                     break;
             }
 
@@ -712,7 +720,7 @@ function updateTodayChart() {
     config[offset].data.datasets[0].backgroundColor = today.map(x => x.color);
     config[offset].options.scales.yAxes[0].scaleLabel.labelString = label;
 
-    if( config[offset].settings.type == 'avg_growth' || config[offset].settings.type == 'cfr' ) {
+    if( config[offset].settings.type == 'avg_growth' || config[offset].settings.type == 'cfr' || config[offset].settings.type == 'adr' ) {
       $('#chart0-tab input').prop('checked', false).prop('disabled', true);
       config[offset].settings.perCapita = false;
       config[offset].options.scales.yAxes[0].type = 'linear';
@@ -772,12 +780,12 @@ function addTimeSeries(offset, key, hidden=false) {
         case 'avg':
             series = marginal_value_series(data_, rollingLen, population);
             break;
-        case 'ptr':
+        case 'adr':
             series = data_;
-            var baseCases = baseline == undefined ? 0 : data[key]['cases'][baseline];
-            var cases = data[key]['cases'].slice(dayOffset-1);
+            var baseAdmin = baseline == undefined ? 0 : data[key]['vaccines_administered'][baseline];
+            var admin = data[key]['vaccines_administered'].slice(dayOffset-1);
             for(var i=0;i<series.length;i++)
-                series[i] = (cases[i] - baseCases) / (series[i] - base);
+                series[i] = (admin[i] - baseAdmin) / (series[i] - base);
             break;
         case 'cfr':
             series = data_;
@@ -842,8 +850,12 @@ function updateTimeSeries(offset) {
     });
 
     var field = '';
-    if( config[offset].settings.aggregation == 'ptr' )
-        field = 'Positive Test Rate';
+    if( config[offset].settings.field == 'vaccines_distributed' )
+        field = 'Distributed Doses' + (config[offset].settings.perCapita ? '/1,000' : '');
+    else if( config[offset].settings.field == 'vaccines_administered' )
+        field = 'Administered Doses' + (config[offset].settings.perCapita ? '/1,000' : '');
+    else if( config[offset].settings.aggregation == 'adr' )
+        field = 'Administered Rate';
     else if( config[offset].settings.aggregation == 'cfr' )
         field = 'Case Fatality Rate';
     else {
@@ -857,10 +869,12 @@ function updateTimeSeries(offset) {
     config[offset].options.scales.yAxes[0].scaleLabel.labelString = field;
 }
 
-function updateBadges(state, caseID, deathsID) {
+function updateBadges(state, caseID, deathsID, vaccinesID) {
 
     var cases = data['states'][state]['cases'];
     var deaths = data['states'][state]['deaths'];
+    var vaccines1 = data['states'][state]['vaccines_distributed'];
+    var vaccines2 = data['states'][state]['vaccines_administered'];
     var n = cases.length;
 
     $(caseID).find('.total').text(formatters.number(tot(cases, n-1)));
@@ -872,6 +886,10 @@ function updateBadges(state, caseID, deathsID) {
     $(deathsID).find('.new').text(formatters.number(marginal_value(deaths)));
     $(deathsID).find('.avg').text(formatters.number(marginal_value(deaths, rollingLen)));
     $(deathsID).find('.trend').text(formatters.number(marginal_slope(deaths).toFixed(0), 0, true));
+
+    n = data['most_recent_vaccine_day_offset'];
+    $(vaccinesID).find('.total').text(formatters.number(tot(vaccines1, data['most_recent_vaccine_day_offset'])));
+    $(vaccinesID).find('.admin').text(formatters.number(tot(vaccines2, data['most_recent_vaccine_day_offset'])));
 }
 
 function tableCheckbox(val, id) {
@@ -891,7 +909,7 @@ function tableCheckboxClick(ch, offset) {
 
 function updateState(state, updateMenu) {
 
-    updateBadges(state, '#banner-state-cases', '#banner-state-deaths');
+    updateBadges(state, '#banner-state-cases', '#banner-state-deaths', '#banner-state-vaccines');
 
     var code = data['states'][state]['code'];
     var stateRow = data['states'][state];
@@ -995,6 +1013,9 @@ function initialize() {
         var d = new Date(data['update_date_epoch'] * 1000);
         $('#updated').text(d.toLocaleString());
         $('#newdate').text(data['most_recent_day']);
+        $('#newvaxdate').text(data['most_recent_vaccine_day']);
+
+        data['most_recent_vaccine_day_offset'] = data['days'].findIndex(elem => elem == data['most_recent_vaccine_day'])
 
         var i = 0, case_list = [];
         for(i=0;i<4;i++)
@@ -1002,7 +1023,7 @@ function initialize() {
 
         var default_state = getCookie('usState', 'Virginia');
         $table = $('#state-table').DataTable();
-        $tests = $('#tests-table').DataTable();
+        $vaccines = $('#vaccines-table').DataTable();
         i = 0;
         for(var key in data['states']) {
             // assign constant chart colors for states
@@ -1010,8 +1031,10 @@ function initialize() {
             
             var cases = data['states'][key]['cases'];
             var deaths = data['states'][key]['deaths'];
-            var tests = data['states'][key]['tests'];
+            var distributed = data['states'][key]['vaccines_distributed'];
+            var administered = data['states'][key]['vaccines_administered'];
             var n = cases.length - 1;
+            var vn = data['most_recent_vaccine_day_offset'];
             var code = data['states'][key]['code'];
             var pop = data['states'][key]['population'];
 
@@ -1032,26 +1055,28 @@ function initialize() {
             if( data['states'][key]['admin'] == 0 )
                 $(row).addClass('aggregate');
             else {
-                case_list.push({code: code, cases: cases[n], tests: tests[n]});
+                case_list.push({code: code, cases: cases[n], vaccines: distributed[vn]});
                 $opt = $('<option/>').val(key).attr('selected', key == default_state).text(key);
                 $('#state-detail-select').append($opt);
             }
 
-            $chk = tableCheckbox(key, 'chk-tests-' + code);
-            var row = $tests.row.add([code, $chk.prop('outerHTML'), 99, key,
-              tests[n], tests[n]/pop, cases[n]/tests[n]
+            $chk = tableCheckbox(key, 'chk-vaccines-' + code);
+            var row = $vaccines.row.add([code, $chk.prop('outerHTML'), 99, key,
+              tot(distributed, vn), per_capita(tot(distributed, vn), pop),
+              tot(administered, vn), per_capita(tot(administered, vn), pop),
+              tot(administered, vn)/tot(distributed, vn)
             ]).node();
             if( data['states'][key]['admin'] == 0 )
               $(row).addClass('aggregate');
         }
 
         $table.draw();
-        $tests.draw();
+        $vaccines.draw();
         $('#state-table input').click(function(event) {
             tableCheckboxClick(this, 0);
         });
 
-        $('#tests-table input').click(function(event) {
+        $('#vaccines-table input').click(function(event) {
             tableCheckboxClick(this, 3);
         });
 
@@ -1068,16 +1093,16 @@ function initialize() {
                 $('#chk-state-' + case_list[i].code).prop('checked', true);
             }
 
-            case_list.sort(function(b, a) { return a.tests - b.tests });
+            case_list.sort(function(b, a) { return a.vaccines - b.vaccines });
             for(i=0;i<5;i++) {
-                $('#chk-tests-' + case_list[i].code).prop('checked', true);
+                $('#chk-vaccines-' + case_list[i].code).prop('checked', true);
             }
         }
 
         updateTimeSeries(0);
         updateTimeSeries(3);
 
-        updateBadges('USA', '#banner-cases', '#banner-deaths');
+        updateBadges('USA', '#banner-cases', '#banner-deaths', '#banner-vaccines');
         updateState(default_state);
 
         $table = $('#topcounty-table').DataTable();
@@ -1233,7 +1258,7 @@ $(document).ready(function() {
     $('#state-table').DataTable(tableParams('state', 0));
     $('#county-table').DataTable(tableParams('county', 1));
     $('#topcounty-table').DataTable(tableParams('topcounty', 2));
-    $('#tests-table').DataTable({
+    $('#vaccines-table').DataTable({
       paging: false,
       autoWidth: false,
       searching: true,
@@ -1241,9 +1266,9 @@ $(document).ready(function() {
       order: [[ 4, 'desc' ]],
       dom: 'Bfrtip',
       buttons: [
-        { text: 'Top 5',  action: function() { autoCheck('tests', 3,  5) } },
-        { text: 'Top 10', action: function() { autoCheck('tests', 3, 10) } },
-        { text: 'None',   action: function() { autoCheck('tests', 3, -1) } },
+        { text: 'Top 5',  action: function() { autoCheck('vaccines', 3,  5) } },
+        { text: 'Top 10', action: function() { autoCheck('vaccines', 3, 10) } },
+        { text: 'None',   action: function() { autoCheck('vaccines', 3, -1) } },
       ],
       columnDefs: [
           {
@@ -1259,19 +1284,19 @@ $(document).ready(function() {
             render: function(data) {
                 return formatters.number(data)
             },
-            targets: 4
+            targets: [4, 6]
           },
           {
             render: function(data) {
                 return data.toFixed(3);
             },
-            targets: 5
+            targets: [5, 7]
           },
           {
             render: function(data) {
                 return formatters.pct_label(data);
             },
-            targets: 6
+            targets: 8
           }
       ]
     });
@@ -1323,7 +1348,7 @@ $(document).ready(function() {
       config[offset].chart_.update();
     });
 
-    $('#states-select, #local-select, #topcounty-select, #test-select').change(function() {
+    $('#states-select, #local-select, #topcounty-select, #vaccines-select').change(function() {
         var offset = parseInt($(this).attr('data-offset'));
         var parts = $(this).val().split('-');
         config[offset].settings.field = parts[0];
@@ -1331,7 +1356,7 @@ $(document).ready(function() {
         updateTimeSeries(offset);
 
         if( offset == 3 ) {
-            if( parts[1] == 'ptr' ) {
+            if( parts[1] == 'adr' ) {
                 $('#chart4-tab .chart-wrapper input').prop('checked', false).prop('disabled', true);
                 config[3].settings.perCapita = false;
             }

@@ -81,12 +81,20 @@ div.covid-banner td:nth-child(2) {
   background: rgba(153, 102, 255, 0.8);
 }
 
+#banner-vaccines {
+  background: rgba(124, 255, 102, 0.8);
+}
+
 #banner-state-cases {
   background: rgba(255, 159, 64, 0.8);
 }
 
 #banner-state-deaths {
   background: rgba(54, 162, 235, 0.8);
+}
+
+#banner-state-vaccines {
+  background: rgba(44, 191, 84, 0.8);
 }
 
 h3.summary {
@@ -140,6 +148,21 @@ table.table-cases.check-table th:nth-child(2), table.table-cases.check-table td:
       font-size: 0.85em;
     }
 }
+
+/* small columns need to kick in earlier for banners so mobiles work right */
+@media (min-width: 450px) {
+  .banner-row .col-sm-6 {
+    width: 50%;
+  }
+}
+
+@media (min-width: 992px) {
+  .banner-row .col-md-4 {
+    width: 33.33333333%;
+  }
+}
+
+
 
 #state-table_wrapper .dt-buttons::before {
   content: "Select: ";

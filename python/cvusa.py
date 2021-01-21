@@ -149,6 +149,7 @@ data = {
   'update_date': datetime.strftime(last_modified, '%Y-%m-%dT%H:%M:%S+0000'),
   'update_date_epoch': last_modified.timestamp() + utcoffset,
   'most_recent_day': date_columns_with_century[-1],
+  'most_recent_vaccine_day': None,
   'days': date_columns_with_century,
   'cases': None,
   'deaths': None,
@@ -173,7 +174,9 @@ data['new_deaths'] = int(deaths[today] - deaths[yesterday])
 # This is probably not the official national population estimate, but for this purpose it's close enough
 data['states']['USA'] = case_data(cases[date_columns], deaths[date_columns], code='USA', fips='00', admin=0,
   population=int(bg1['population'].sum()),
-  tests=[None]*len(date_columns), hospitalizations=[None]*len(date_columns))
+  # tests=[None]*len(date_columns),
+  # hospitalizations=[None]*len(date_columns),
+  vaccines_distributed=[None]*len(date_columns), vaccines_administered=[None]*len(date_columns))
 
 c2 = c.groupby('Province/State').sum()
 d2 = d.groupby('Province/State').sum()
@@ -184,7 +187,9 @@ for key,row in c2.iterrows():
     if code:
         data['states'][key] = case_data(row[date_columns], d2.loc[key, date_columns], code=code, fips=fips, admin=1,
           population=int(bg1['population'].get(key)),
-          tests=[None]*len(date_columns), hospitalizations=[None]*len(date_columns))
+          # tests=[None]*len(date_columns),
+          # hospitalizations=[None]*len(date_columns),
+          vaccines_distributed=[None]*len(date_columns), vaccines_administered=[None]*len(date_columns))
 
 for key,row in c.sort_values(today, ascending=False).head(50).iterrows():
     fips = row['FIPS']
@@ -201,26 +206,54 @@ for key,row in c.sort_values(today, ascending=False).head(50).iterrows():
     data['counties'][addr] = case_data(row[date_columns], d.loc[key, date_columns], fips=fips, county=admin2, state=row['Province/State'], state_abbr=code, admin=2, population=safe_cast(bg2['population'].get(fips, None)))
     
 # cycle through the daily files and add test data - eventually could add hospitalizations
-for obj in get_repo_file('csse_covid_19_data/csse_covid_19_daily_reports_us'):
-    x = re.match(r'^(\d{2})-(\d{2})-(\d{4}).csv$', obj.name)
-    if x:
-        ts = '{}/{}/{}'.format(int(x.group(1)), int(x.group(2)), x.group(3))
-        if ts in date_columns_with_century:
-            offset = date_columns_with_century.index(ts)
-            dailies = pd.read_csv(obj.download_url).set_index('Province_State')
-            if 'People_Tested' in dailies:
-                data['states']['USA']['tests'][offset] = dailies.sum()['People_Tested']
+if False:
+    # disable this code block
+    for obj in get_repo_file('csse_covid_19_data/csse_covid_19_daily_reports_us'):
+        x = re.match(r'^(\d{2})-(\d{2})-(\d{4}).csv$', obj.name)
+        if x:
+            ts = '{}/{}/{}'.format(int(x.group(1)), int(x.group(2)), x.group(3))
+            if ts in date_columns_with_century:
+                offset = date_columns_with_century.index(ts)
+                dailies = pd.read_csv(obj.download_url).set_index('Province_State')
+                if 'People_Tested' in dailies:
+                    data['states']['USA']['tests'][offset] = dailies.sum()['People_Tested']
 
-            data['states']['USA']['hospitalizations'][offset] = dailies.sum()['People_Hospitalized']
+                # data['states']['USA']['hospitalizations'][offset] = dailies.sum()['People_Hospitalized']
 
-            for key,row in dailies.iterrows():
-                code = bg1['code'].get(key)
-                if code:
-                    if 'People_Tested' in row:
-                        data['states'][key]['tests'][offset] = nan_to_none(row['People_Tested'])
+                for key,row in dailies.iterrows():
+                    code = bg1['code'].get(key)
+                    if code:
+                        if 'People_Tested' in row:
+                            data['states'][key]['tests'][offset] = nan_to_none(row['People_Tested'])
 
-                    data['states'][key]['hospitalizations'][offset] = nan_to_none(row['People_Hospitalized'])
+                        # data['states'][key]['hospitalizations'][offset] = nan_to_none(row['People_Hospitalized'])
 
+
+vaccine_data = pd.read_csv('http://cvapi.zognet.net/v2/USA/vaccines.csv')
+vaccine_data['Date'] = pd.to_datetime(vaccine_data['Date'])
+vaccine_data.set_index(['Date', 'FIPS'], inplace=True)
+vaccine_keys = {row['code']:k for k,row in data['states'].items()}
+
+for dt in vaccine_data.index.unique(0):
+
+    dStr = dt.strftime('%-m/%-d/%Y')
+    if dStr in date_columns_with_century:
+        offset = date_columns_with_century.index(dStr)
+        data['states']['USA']['vaccines_distributed'][offset] = int(vaccine_data.loc[(dt, 'US'),'Dist'])
+        data['states']['USA']['vaccines_administered'][offset] = int(vaccine_data.loc[(dt, 'US'),'Admin_Total'])
+        for k,row in vaccine_data.xs(dt).iterrows():
+            if k in vaccine_keys:
+                data['states'][vaccine_keys[k]]['vaccines_distributed'][offset] = int(row['Dist'])
+                data['states'][vaccine_keys[k]]['vaccines_administered'][offset] = int(row['Admin_Total'])
+
+# store the most recent vaccine data, which may be different than case data
+dt = list(vaccine_data.index.unique(0))
+dt.sort(reverse=True)
+for elem in dt:
+    dStr = elem.strftime('%-m/%-d/%Y')
+    if dStr in date_columns_with_century:
+        data['most_recent_vaccine_day'] = dStr
+        break
 
 with open(os.path.join(options['TARGET_DIR'], 'USA.json'), 'w') as fd:
     json.dump(data, fd)
