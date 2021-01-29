@@ -114,11 +114,15 @@ table.table-cases th, table.table-cases td {
   text-align: right;
 }
 
-table.table-cases th:nth-child(1), table.table-cases td:nth-child(1), table.table-cases.check-table th:nth-child(3), table.table-cases.check-table td:nth-child(3) {
+table.table-cases th.title {
+  text-align: center;
+}
+
+table.table-cases th.col-checkbox, table.table-cases th.col-name, table.table-cases td:nth-child(1), table.table-cases.check-table td:nth-child(3) {
   text-align: left;
 }
 
-table.table-cases.check-table th:nth-child(2), table.table-cases.check-table td:nth-child(2) {
+table.table-cases.check-table th.col-rank, table.table-cases.check-table td:nth-child(2) {
   text-align: center;
 }
 
