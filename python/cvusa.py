@@ -133,6 +133,12 @@ d = get_covid_frame(deaths_url, True)
 c['FIPS'] = c['FIPS'].map(lambda x: '{:05d}'.format(int(np.nan_to_num(x))))
 d['FIPS'] = d['FIPS'].map(lambda x: '{:05d}'.format(int(np.nan_to_num(x))))
 
+# load vaccine data
+vaccine_data = pd.read_csv('http://cvapi.zognet.net/v2/USA/vaccines.csv')
+vaccine_data['Date'] = pd.to_datetime(vaccine_data['Date'])
+vaccine_data.set_index(['Date', 'FIPS'], inplace=True)
+vaccine_columns = list(vaccine_data.index.unique(0).strftime('%-m/%-d/%Y'))
+
 # date columns are those that look like */*/*
 date_columns = list(filter(lambda x: len(x.split('/')) == 3, c.columns))
 date_columns_with_century = list(map(add_century, date_columns))
@@ -149,8 +155,9 @@ data = {
   'update_date': datetime.strftime(last_modified, '%Y-%m-%dT%H:%M:%S+0000'),
   'update_date_epoch': last_modified.timestamp() + utcoffset,
   'most_recent_day': date_columns_with_century[-1],
-  'most_recent_vaccine_day': None,
+  'most_recent_vaccine_day': vaccine_columns[-1],
   'days': date_columns_with_century,
+  'vaccine_days': vaccine_columns,
   'cases': None,
   'deaths': None,
   'new_cases': None,
@@ -176,7 +183,8 @@ data['states']['USA'] = case_data(cases[date_columns], deaths[date_columns], cod
   population=int(bg1['population'].sum()),
   # tests=[None]*len(date_columns),
   # hospitalizations=[None]*len(date_columns),
-  vaccines_distributed=[None]*len(date_columns), vaccines_administered=[None]*len(date_columns))
+  vaccines_distributed=[None]*len(vaccine_columns), vaccines_administered=[None]*len(vaccine_columns),
+  vaccines_admin1=[None]*len(vaccine_columns), vaccines_admin2=[None]*len(vaccine_columns))
 
 c2 = c.groupby('Province/State').sum()
 d2 = d.groupby('Province/State').sum()
@@ -189,7 +197,8 @@ for key,row in c2.iterrows():
           population=int(bg1['population'].get(key)),
           # tests=[None]*len(date_columns),
           # hospitalizations=[None]*len(date_columns),
-          vaccines_distributed=[None]*len(date_columns), vaccines_administered=[None]*len(date_columns))
+          vaccines_distributed=[None]*len(vaccine_columns), vaccines_administered=[None]*len(vaccine_columns),
+          vaccines_admin1=[None]*len(vaccine_columns), vaccines_admin2=[None]*len(vaccine_columns))
 
 for key,row in c.sort_values(today, ascending=False).head(50).iterrows():
     fips = row['FIPS']
@@ -228,32 +237,21 @@ if False:
 
                         # data['states'][key]['hospitalizations'][offset] = nan_to_none(row['People_Hospitalized'])
 
-
-vaccine_data = pd.read_csv('http://cvapi.zognet.net/v2/USA/vaccines.csv')
-vaccine_data['Date'] = pd.to_datetime(vaccine_data['Date'])
-vaccine_data.set_index(['Date', 'FIPS'], inplace=True)
 vaccine_keys = {row['code']:k for k,row in data['states'].items()}
-
 for dt in vaccine_data.index.unique(0):
 
     dStr = dt.strftime('%-m/%-d/%Y')
-    if dStr in date_columns_with_century:
-        offset = date_columns_with_century.index(dStr)
-        data['states']['USA']['vaccines_distributed'][offset] = int(vaccine_data.loc[(dt, 'US'),'Dist'])
-        data['states']['USA']['vaccines_administered'][offset] = int(vaccine_data.loc[(dt, 'US'),'Admin_Total'])
-        for k,row in vaccine_data.xs(dt).iterrows():
-            if k in vaccine_keys:
-                data['states'][vaccine_keys[k]]['vaccines_distributed'][offset] = int(row['Dist'])
-                data['states'][vaccine_keys[k]]['vaccines_administered'][offset] = int(row['Admin_Total'])
-
-# store the most recent vaccine data, which may be different than case data
-dt = list(vaccine_data.index.unique(0))
-dt.sort(reverse=True)
-for elem in dt:
-    dStr = elem.strftime('%-m/%-d/%Y')
-    if dStr in date_columns_with_century:
-        data['most_recent_vaccine_day'] = dStr
-        break
+    offset = vaccine_columns.index(dStr)
+    data['states']['USA']['vaccines_distributed'][offset] = int(vaccine_data.loc[(dt, 'US'),'Dist'])
+    data['states']['USA']['vaccines_administered'][offset] = int(vaccine_data.loc[(dt, 'US'),'Admin_Total'])
+    data['states']['USA']['vaccines_admin1'][offset] = int(vaccine_data.loc[(dt, 'US'),'Admin_1Plus'])
+    data['states']['USA']['vaccines_admin2'][offset] = int(vaccine_data.loc[(dt, 'US'),'Admin_2'])
+    for k,row in vaccine_data.xs(dt).iterrows():
+        if k in vaccine_keys:
+            data['states'][vaccine_keys[k]]['vaccines_distributed'][offset] = int(row['Dist'])
+            data['states'][vaccine_keys[k]]['vaccines_administered'][offset] = int(row['Admin_Total'])
+            data['states'][vaccine_keys[k]]['vaccines_admin1'][offset] = int(row['Admin_1Plus'])
+            data['states'][vaccine_keys[k]]['vaccines_admin2'][offset] = int(row['Admin_2'])
 
 with open(os.path.join(options['TARGET_DIR'], 'USA.json'), 'w') as fd:
     json.dump(data, fd)

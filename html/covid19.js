@@ -642,7 +642,7 @@ function updateTodayChart() {
             var vAdmin = data['states'][key]['vaccines_administered'];
             var color = data['states'][key]['lineColor'];
             n = cases.length - 1;
-            vn = data['most_recent_vaccine_day_offset'];
+            vn = vDist.length - 1;
             if( config[offset].settings.perCapita ) {
                 population = data['states'][key]['population'] / 1000;
             }
@@ -761,11 +761,18 @@ function addTimeSeries(offset, key, hidden=false) {
         population = data[key]['population'] / 1000;
     }
 
-    // grab the base value before we slice up the array
-    var base  = baseline == undefined ? 0 : data[key][type][baseline];
-
     // here we grab 1 prior value so we can calculate 'new' cases if necessary. Then we start indexing from 1
-    var data_ = data[key][type].slice(dayOffset-1);
+    if( offset == 3 ) {
+        // vaccine data are a special case
+        var base = 0;
+        var data_ = [0].concat(data[key][type])
+    }
+    else {
+        // grab the base value before we slice up the array
+        var base = baseline == undefined ? 0 : data[key][type][baseline];
+        var data_ = data[key][type].slice(dayOffset-1);
+    }
+
     switch(seriesType) {
         case 'total':
             series = data_;
@@ -783,9 +790,9 @@ function addTimeSeries(offset, key, hidden=false) {
         case 'adr':
             series = data_;
             var baseAdmin = baseline == undefined ? 0 : data[key]['vaccines_administered'][baseline];
-            var admin = data[key]['vaccines_administered'].slice(dayOffset-1);
+            var admin = [0].concat(data[key]['vaccines_administered']);
             for(var i=0;i<series.length;i++)
-                series[i] = (admin[i] - baseAdmin) / (series[i] - base);
+                series[i] = admin[i] / series[i];
             break;
         case 'cfr':
             series = data_;
@@ -797,6 +804,8 @@ function addTimeSeries(offset, key, hidden=false) {
     }
 
     var n = {label: label, id: key, fill: false, backgroundColor: color, borderColor: color, hidden: hidden, data: series.slice(1)};
+    if( offset == 3 )
+        n.tension = false;
 
     var t = {...n}
     t.label = '-' + t.label;
@@ -887,9 +896,9 @@ function updateBadges(state, caseID, deathsID, vaccinesID) {
     $(deathsID).find('.avg').text(formatters.number(marginal_value(deaths, rollingLen)));
     $(deathsID).find('.trend').text(formatters.number(marginal_slope(deaths).toFixed(0), 0, true));
 
-    n = data['most_recent_vaccine_day_offset'];
-    $(vaccinesID).find('.total').text(formatters.number(tot(vaccines1, data['most_recent_vaccine_day_offset'])));
-    $(vaccinesID).find('.admin').text(formatters.number(tot(vaccines2, data['most_recent_vaccine_day_offset'])));
+    n = vaccines1.length;
+    $(vaccinesID).find('.total').text(formatters.number(tot(vaccines1, n-1)));
+    $(vaccinesID).find('.admin').text(formatters.number(tot(vaccines2, n-1)));
 }
 
 function tableCheckbox(val, id) {
@@ -1015,11 +1024,11 @@ function initialize() {
         $('#newdate').text(data['most_recent_day']);
         $('#newvaxdate').text(data['most_recent_vaccine_day']);
 
-        data['most_recent_vaccine_day_offset'] = data['days'].findIndex(elem => elem == data['most_recent_vaccine_day'])
-
         var i = 0, case_list = [];
-        for(i=0;i<4;i++)
+        for(i=0;i<3;i++)
             config[i].data.labels = data['days'].slice(dayOffset);
+
+        config[3].data.labels = data['vaccine_days'];
 
         var default_state = getCookie('usState', 'Virginia');
         $table = $('#state-table').DataTable();
@@ -1034,7 +1043,7 @@ function initialize() {
             var distributed = data['states'][key]['vaccines_distributed'];
             var administered = data['states'][key]['vaccines_administered'];
             var n = cases.length - 1;
-            var vn = data['most_recent_vaccine_day_offset'];
+            var vn = distributed.length - 1;
             var code = data['states'][key]['code'];
             var pop = data['states'][key]['population'];
 
