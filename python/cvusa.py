@@ -137,7 +137,17 @@ d['FIPS'] = d['FIPS'].map(lambda x: '{:05d}'.format(int(np.nan_to_num(x))))
 vaccine_data = pd.read_csv('http://cvapi.zognet.net/v2/USA/vaccines.csv')
 vaccine_data['Date'] = pd.to_datetime(vaccine_data['Date'])
 vaccine_data.set_index(['Date', 'FIPS'], inplace=True)
-vaccine_columns = list(vaccine_data.index.unique(0).strftime('%-m/%-d/%Y'))
+
+# there's no data for 1/16-1/18 which makes the charts ugly. Since 1/15 value
+# are identical to 1/19 we just remove them. The rest of the series *should*
+# be complete on a daily basis (but this code doesn't assume that)
+vaccine_data.drop('1/15/2021', inplace=True)
+
+# In case there are gaps in the series, we construct our day index by hand
+vc1 = vaccine_data.index.unique(0)[0]
+vaccine_columns = []
+for i in range(0, (vaccine_data.index.unique(0)[-1] - vaccine_data.index.unique(0)[0]).days + 1):
+    vaccine_columns.append((vaccine_data.index.unique(0)[0] + pd.Timedelta(days=i)).strftime('%-m/%-d/%Y'))
 
 # date columns are those that look like */*/*
 date_columns = list(filter(lambda x: len(x.split('/')) == 3, c.columns))
