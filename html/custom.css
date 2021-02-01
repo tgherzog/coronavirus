@@ -164,6 +164,10 @@ table.table-cases.check-table th.col-rank, table.table-cases.check-table td:nth-
   .banner-row .col-md-4 {
     width: 33.33333333%;
   }
+
+  #banner-vaccines td.name {
+    font-size: 0.8em;
+  }
 }
 
 
