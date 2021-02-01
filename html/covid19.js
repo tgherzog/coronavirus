@@ -581,17 +581,18 @@ function marginal_value(data, span, n) {
     if( n == null ) n = data.length-1;
     if( span == null ) span = 1;
 
-    var sum = 0, i = 0;
+    var sum = 0, i = 0, N = 0;
     n -= span-1;
     while( i < span ) {
-        if( data[i+n] == null || data[i+n-1] == null )
-            return null;
+        if( data[i+n] != null && data[i+n-1] != null ) {
+            sum += data[i+n] - data[i+n-1];
+            N++;
+        }
 
-        sum += data[i+n] - data[i+n-1];
         i++;
     }
 
-    return sum / span;
+    return sum / N;
 }
 
 function marginal_value_series(data, span, population) {
@@ -701,10 +702,20 @@ function updateTodayChart() {
                     label = 'Administered Vaccine Doses' + pc;
                     label2 = 'Doses' + pc;
                     break;
+                case 'admin1_doses':
+                    obs = data['states'][key]['vaccines_admin1'][vn] / population;
+                    label = 'Received 1 or More Doses' + pc;
+                    label2 = 'Persons' + pc;
+                    break;
+                case 'admin2_doses':
+                    obs = data['states'][key]['vaccines_admin2'][vn] / population;
+                    label = 'Received 2  Doses' + pc;
+                    label2 = 'Persons' + pc;
+                    break;
                 case 'adr':
                     obs = vAdmin[vn] / vDist[vn];
-                    label = 'Administered Vaccine Doses' + pc;
-                    label2 = 'Doses' + pc;
+                    label = 'Administered Rate';
+                    label2 = 'ADR';
                     break;
             }
 
@@ -765,7 +776,7 @@ function addTimeSeries(offset, key, hidden=false) {
     if( offset == 3 ) {
         // vaccine data are a special case
         var base = 0;
-        var data_ = [0].concat(data[key][type])
+        var data_ = [null].concat(data[key][type])
     }
     else {
         // grab the base value before we slice up the array
@@ -789,8 +800,7 @@ function addTimeSeries(offset, key, hidden=false) {
             break;
         case 'adr':
             series = data_;
-            var baseAdmin = baseline == undefined ? 0 : data[key]['vaccines_administered'][baseline];
-            var admin = [0].concat(data[key]['vaccines_administered']);
+            var admin = [null].concat(data[key]['vaccines_administered']);
             for(var i=0;i<series.length;i++)
                 series[i] = admin[i] / series[i];
             break;
@@ -859,14 +869,18 @@ function updateTimeSeries(offset) {
     });
 
     var field = '';
-    if( config[offset].settings.field == 'vaccines_distributed' )
-        field = 'Distributed Doses' + (config[offset].settings.perCapita ? '/1,000' : '');
-    else if( config[offset].settings.field == 'vaccines_administered' )
-        field = 'Administered Doses' + (config[offset].settings.perCapita ? '/1,000' : '');
-    else if( config[offset].settings.aggregation == 'adr' )
+    if( config[offset].settings.aggregation == 'adr' )
         field = 'Administered Rate';
     else if( config[offset].settings.aggregation == 'cfr' )
         field = 'Case Fatality Rate';
+    else if( config[offset].settings.field == 'vaccines_distributed' )
+        field = 'Distributed Doses' + (config[offset].settings.perCapita ? '/1,000' : '');
+    else if( config[offset].settings.field == 'vaccines_administered' )
+        field = 'Administered Doses' + (config[offset].settings.perCapita ? '/1,000' : '');
+    else if( config[offset].settings.field == 'vaccines_admin1' )
+        field = 'Received 1 or More Doses' + (config[offset].settings.perCapita ? '/1,000' : '');
+    else if( config[offset].settings.field == 'vaccines_admin2' )
+        field = 'Received 2 Doses' + (config[offset].settings.perCapita ? '/1,000' : '');
     else {
         var agg = config[offset].settings.aggregation == 'total' ? 'total' : 'new';
         field = capitalize(agg) + ' ' + capitalize(config[offset].settings.field);
@@ -896,9 +910,10 @@ function updateBadges(state, caseID, deathsID, vaccinesID) {
     $(deathsID).find('.avg').text(formatters.number(marginal_value(deaths, rollingLen)));
     $(deathsID).find('.trend').text(formatters.number(marginal_slope(deaths).toFixed(0), 0, true));
 
-    n = vaccines1.length;
-    $(vaccinesID).find('.total').text(formatters.number(tot(vaccines1, n-1)));
-    $(vaccinesID).find('.admin').text(formatters.number(tot(vaccines2, n-1)));
+    n = vaccines1.length-1;
+    $(vaccinesID).find('.total').text(formatters.number(tot(vaccines1, n)));
+    $(vaccinesID).find('.admin').text(formatters.number(tot(vaccines2, n)));
+    $(vaccinesID).find('.rate').text((data['states'][state]['vaccines_admin2'][n] * 100 / data['states'][state]['population']).toFixed(1) + '%');
 }
 
 function tableCheckbox(val, id) {
@@ -1040,10 +1055,7 @@ function initialize() {
             
             var cases = data['states'][key]['cases'];
             var deaths = data['states'][key]['deaths'];
-            var distributed = data['states'][key]['vaccines_distributed'];
-            var administered = data['states'][key]['vaccines_administered'];
             var n = cases.length - 1;
-            var vn = distributed.length - 1;
             var code = data['states'][key]['code'];
             var pop = data['states'][key]['population'];
 
@@ -1069,11 +1081,34 @@ function initialize() {
                 $('#state-detail-select').append($opt);
             }
 
+            var distributed = data['states'][key]['vaccines_distributed'];
+            var administered = data['states'][key]['vaccines_administered'];
+            var admin1 = data['states'][key]['vaccines_admin1'];
+            var admin2 = data['states'][key]['vaccines_admin2'];
+            var vn = distributed.length - 1;
+            var avg_dists  = marginal_value(distributed, rollingLen);
+            var avg_admins = marginal_value(administered, rollingLen);
+            var avg_admin1 = marginal_value(admin1, rollingLen);
+            var avg_admin2 = marginal_value(admin2, rollingLen);
+
             $chk = tableCheckbox(key, 'chk-vaccines-' + code);
             var row = $vaccines.row.add([code, $chk.prop('outerHTML'), 99, key,
-              tot(distributed, vn), per_capita(tot(distributed, vn), pop),
-              tot(administered, vn), per_capita(tot(administered, vn), pop),
-              tot(administered, vn)/tot(distributed, vn)
+              distributed[vn], per_capita(distributed[vn], pop),
+              distributed[vn] - distributed[vn-1], per_capita(distributed[vn] - distributed[vn-1], pop),
+              avg_dists, per_capita(avg_dists, pop),
+
+              administered[vn], per_capita(administered[vn], pop),
+              administered[vn] - administered[vn-1], per_capita(administered[vn] - administered[vn-1], pop),
+              avg_admins, per_capita(avg_admins, pop),
+              administered[vn] / distributed[vn],
+
+              admin1[vn], per_capita(admin1[vn], pop),
+              admin1[vn] - admin1[vn-1], per_capita(admin1[vn] - admin1[vn-1], pop),
+              avg_admin1, per_capita(avg_admin1, pop),
+
+              admin2[vn], per_capita(admin2[vn], pop),
+              admin2[vn] - admin2[vn-1], per_capita(admin2[vn] - admin2[vn-1], pop),
+              avg_admin2, per_capita(avg_admin2, pop)
             ]).node();
             if( data['states'][key]['admin'] == 0 )
               $(row).addClass('aggregate');
@@ -1293,19 +1328,23 @@ $(document).ready(function() {
             render: function(data) {
                 return formatters.number(data)
             },
-            targets: [4, 6]
+            targets: [4, 6, 8, 10, 12, 14, 17, 19, 21, 23, 25, 27]
           },
           {
             render: function(data) {
                 return data.toFixed(3);
             },
-            targets: [5, 7]
+            targets: [5, 7, 9, 11, 13, 15, 18, 20, 22, 24, 26, 28]
           },
           {
             render: function(data) {
                 return formatters.pct_label(data);
             },
-            targets: 8
+            targets: 16
+          },
+          {
+            visible: false,
+            targets: [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28]
           }
       ]
     });
@@ -1364,6 +1403,7 @@ $(document).ready(function() {
         config[offset].settings.aggregation = parts[1];
         updateTimeSeries(offset);
 
+        $table = $(config[offset].settings.uiContainer).DataTable();
         if( offset == 3 ) {
             if( parts[1] == 'adr' ) {
                 $('#chart4-tab .chart-wrapper input').prop('checked', false).prop('disabled', true);
@@ -1371,17 +1411,30 @@ $(document).ready(function() {
             }
             else
                 $('#chart4-tab .chart-wrapper input').removeAttr('disabled');
+
+            for(var i=4;i<29;i++) {
+                var vis = false;
+                if( parts[0] == 'vaccines_distributed' )
+                    vis = i >= 4 && i < 10;
+                else if( parts[0] == 'vaccines_administered' )
+                    vis = i >= 10 && i < 17;
+                else if( parts[0] == 'vaccines_admin1' )
+                    vis = i >= 17 && i < 23;
+                else if( parts[0] == 'vaccines_admin2' )
+                    vis = i >= 23;
+
+                $table.column(i).visible(vis);
+            }
         }
         else {
-            $table = $(config[offset].settings.uiContainer).DataTable();
             for(var i=4;i<16;i++) {
                 if( parts[0] == 'cases' )
                     $table.column(i).visible(i<10);
                 else
                     $table.column(i).visible(i>=10);
             }
-            $table.draw();
         }
+        $table.draw();
 
         config[offset].chart_.update();
     });

@@ -101,7 +101,7 @@ h3.summary {
   text-align: center;
 }
 
-p.timestamp span {
+p.timestamp span, span.nowrap {
   white-space: nowrap;
 }
 
