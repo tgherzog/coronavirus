@@ -194,7 +194,7 @@ data['states']['USA'] = case_data(cases[date_columns], deaths[date_columns], cod
   # tests=[None]*len(date_columns),
   # hospitalizations=[None]*len(date_columns),
   vaccines_distributed=[None]*len(vaccine_columns), vaccines_administered=[None]*len(vaccine_columns),
-  vaccines_admin1=[None]*len(vaccine_columns), vaccines_admin2=[None]*len(vaccine_columns))
+  vaccines_admin1=[None]*len(vaccine_columns), vaccines_complete=[None]*len(vaccine_columns))
 
 c2 = c.groupby('Province/State').sum()
 d2 = d.groupby('Province/State').sum()
@@ -208,7 +208,7 @@ for key,row in c2.iterrows():
           # tests=[None]*len(date_columns),
           # hospitalizations=[None]*len(date_columns),
           vaccines_distributed=[None]*len(vaccine_columns), vaccines_administered=[None]*len(vaccine_columns),
-          vaccines_admin1=[None]*len(vaccine_columns), vaccines_admin2=[None]*len(vaccine_columns))
+          vaccines_admin1=[None]*len(vaccine_columns), vaccines_complete=[None]*len(vaccine_columns))
 
 for key,row in c.sort_values(today, ascending=False).head(50).iterrows():
     fips = row['FIPS']
@@ -255,13 +255,13 @@ for dt in vaccine_data.index.unique(0):
     data['states']['USA']['vaccines_distributed'][offset] = int(vaccine_data.loc[(dt, 'US'),'Dist'])
     data['states']['USA']['vaccines_administered'][offset] = int(vaccine_data.loc[(dt, 'US'),'Admin_Total'])
     data['states']['USA']['vaccines_admin1'][offset] = int(vaccine_data.loc[(dt, 'US'),'Admin_1Plus'])
-    data['states']['USA']['vaccines_admin2'][offset] = int(vaccine_data.loc[(dt, 'US'),'Admin_2'])
+    data['states']['USA']['vaccines_complete'][offset] = int(vaccine_data.loc[(dt, 'US'),'Admin_Complete'])
     for k,row in vaccine_data.xs(dt).iterrows():
         if k in vaccine_keys:
             data['states'][vaccine_keys[k]]['vaccines_distributed'][offset] = int(row['Dist'])
             data['states'][vaccine_keys[k]]['vaccines_administered'][offset] = int(row['Admin_Total'])
             data['states'][vaccine_keys[k]]['vaccines_admin1'][offset] = int(row['Admin_1Plus'])
-            data['states'][vaccine_keys[k]]['vaccines_admin2'][offset] = int(row['Admin_2'])
+            data['states'][vaccine_keys[k]]['vaccines_complete'][offset] = int(row['Admin_Complete'])
 
 with open(os.path.join(options['TARGET_DIR'], 'USA.json'), 'w') as fd:
     json.dump(data, fd)

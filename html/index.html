@@ -85,6 +85,7 @@
 
 <div class="row tight">
 <div class="col-xs-6">
+<p id="systemerror"></p>
 <p class="timestamp">Last updated: <span id="updated"></span></p>
 <p class="timestamp">Case data as of: <span id="newdate"></span></p>
 <p class="timestamp">Vaccine data as of: <span id="newvaxdate"></span></p>
@@ -125,7 +126,7 @@
     <table>
     <tr><td class="name">Doses Distributed:</td><td class="total">123,456</td></tr>
     <tr><td class="name">Doses Administered:</td><td class="admin">1,456</td></tr>
-    <tr><td class="name">Vaccination Rate <span class="nowrap">(2 doses):</span></td><td class="rate">10%</td></tr>
+    <tr><td class="name">Vaccination Rate:</td><td class="rate">10%</td></tr>
     </table>
 </div>
 </div>
@@ -160,7 +161,7 @@
                 <option value="admin_doses">Administered Vaccine Doses</option>
                 <option value="adr">Administered Rate</option>
                 <option value="admin1_doses">Received 1 or More Doses</option>
-                <option value="admin2_doses">Received 2 Doses</option>
+                <option value="complete_doses">Completely Vaccinated</option>
                 </select>
                 </form>
                 <canvas id="chart5"></canvas>
@@ -282,7 +283,7 @@
                   <table>
                   <tr><td class="name">Doses Distributed:</td><td class="total">123,456</td></tr>
                   <tr><td class="name">Doses Administered:</td><td class="admin">1,456</td></tr>
-                  <tr><td class="name">Vaccination Rate <span class="nowrap">(2 doses):</span></td><td class="rate">10%</td></tr>
+                  <tr><td class="name">Vaccination Rate:</td><td class="rate">10%</td></tr>
                   </table>
               </div>
           </div>
@@ -438,9 +439,9 @@
                   <option value="vaccines_admin1-total">Total People Received 1 or More Doses</option>
                   <option value="vaccines_admin1-new">Daily People Received 1 or More Doses</option>
                   <option value="vaccines_admin1-avg">Daily People Received 1 or More Doses (rolling average)</option>
-                  <option value="vaccines_admin2-total">Total People Received 2 Doses</option>
-                  <option value="vaccines_admin2-new">Daily People Received 2 Doses</option>
-                  <option value="vaccines_admin2-avg">Daily People Received 2 Doses (rolling average)</option>
+                  <option value="vaccines_complete-total">Total People Completely Vaccinated</option>
+                  <option value="vaccines_complete-new">Daily People Completely Vaccinated</option>
+                  <option value="vaccines_complete-avg">Daily People Completely Vaccinated (rolling average)</option>
                 </select>
                 </form>
                 <canvas id="chart4"></canvas>
@@ -467,7 +468,7 @@
                       <th colspan=6 class="title">Distributed Doses</th>
                       <th colspan=7 class="title">Administered Doses</th>
                       <th colspan=6 class="title">People Received 1 or More Doses</th>
-                      <th colspan=6 class="title">People Received 2 Doses</th>
+                      <th colspan=6 class="title">Completely Vaccinated</th>
                   </tr>
                   <tr>
                       <th>Total</th>
