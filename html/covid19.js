@@ -898,6 +898,7 @@ function updateBadges(state, caseID, deathsID, vaccinesID) {
     var deaths = data['states'][state]['deaths'];
     var vaccines1 = data['states'][state]['vaccines_distributed'];
     var vaccines2 = data['states'][state]['vaccines_administered'];
+    var vaccines3 = data['states'][state]['vaccines_complete'];
     var n = cases.length;
 
     $(caseID).find('.total').text(formatters.number(tot(cases, n-1)));
@@ -913,7 +914,8 @@ function updateBadges(state, caseID, deathsID, vaccinesID) {
     n = vaccines1.length-1;
     $(vaccinesID).find('.total').text(formatters.number(tot(vaccines1, n)));
     $(vaccinesID).find('.admin').text(formatters.number(tot(vaccines2, n)));
-    $(vaccinesID).find('.rate').text((data['states'][state]['vaccines_complete'][n] * 100 / data['states'][state]['population']).toFixed(1) + '%');
+    $(vaccinesID).find('.complete').text(formatters.number(tot(vaccines3, n)));
+    $(vaccinesID).find('.rate').text((vaccines3[n] * 100 / data['states'][state]['population']).toFixed(1) + '%');
 }
 
 function tableCheckbox(val, id) {
