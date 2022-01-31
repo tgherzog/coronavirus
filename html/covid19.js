@@ -166,7 +166,10 @@ function per_capita(value, pop, denom) {
     return value / (pop/pop_denom(denom));
 }
 
-function pop_denom(denom) {
+function pop_denom(denom, str) {
+
+    if( str )
+        return denom == 'deaths' ? '100K' : '1,000';
 
     return denom == 'deaths' ? 100000 : 1000;
 }
@@ -640,7 +643,8 @@ function updateTodayChart() {
     var colors = [];
     var offset = 4;
     var label = '';
-    var pc = config[offset].settings.perCapita ? '/1,000' : '';
+    var type2 = config[offset].settings.type == 'new_deaths' ? 'deaths' : config[offset].settings.type;
+    var pc = config[offset].settings.perCapita ? '/' + pop_denom(type2, true) : '';
     for(var key in data['states']) {
         if( data['states'][key]['admin'] == 1 ) {
             var cases = data['states'][key]['cases'];
@@ -651,7 +655,7 @@ function updateTodayChart() {
             n = cases.length - 1;
             vn = vDist.length - 1;
             if( config[offset].settings.perCapita ) {
-                population = data['states'][key]['population'] / pop_denom(config[offset].settings.type);
+                population = data['states'][key]['population'] / pop_denom(type2);
             }
             else {
                 population = 1;
@@ -975,7 +979,7 @@ function updateState(state, updateMenu) {
                 tot(row.cases, i), per_capita(tot(row.cases, i), pop),
                 new_cases, per_capita(new_cases, pop),
                 avg_cases, per_capita(avg_cases, pop),
-                tot(row.deaths, i), per_capita(tot(row.deaths, i, 'deaths'), pop),
+                tot(row.deaths, i), per_capita(tot(row.deaths, i), pop, 'deaths'),
                 new_deaths, per_capita(new_deaths, pop, 'deaths'),
                 avg_deaths, per_capita(avg_deaths, pop, 'deaths')
             ];
@@ -1196,9 +1200,9 @@ function initialize() {
               tot(cases, n), per_capita(tot(cases, n), pop),
               new_cases, per_capita(new_cases, pop),
               avg_cases, per_capita(avg_cases, pop),
-              tot(deaths, n), per_capita(tot(deaths, n), pop),
-              new_deaths, per_capita(new_deaths, pop),
-              avg_deaths, per_capita(avg_deaths, pop)
+              tot(deaths, n), per_capita(tot(deaths, n), pop, 'deaths'),
+              new_deaths, per_capita(new_deaths, pop, 'deaths'),
+              avg_deaths, per_capita(avg_deaths, pop, 'deaths')
             ]).node();
             case_list.push({code: fips, cases: cases[n]});
         }
