@@ -34,6 +34,16 @@
 
         <p>And in case you're wondering, <a href="http://timherzog.net">this is me</a>.
 
+        <h5>Customization</h5>
+        <p>The dashboard offers a limited amount of customization; add these as query string parameters in the URL.</p>
+
+        <ul>
+            <li><strong>since=m/d/yyyy</strong>: start date for cumulative totals; year is optional, do not include leading zeroes (defaults to 2/29/2020)</li>
+            <li><strong>trend=n</strong>: number of days in trend calculations (defaults to 14)</li>
+            <li><strong>rolling=n</strong>: number of days in rolling averages (defaults to 7)</li>
+        </ul>
+
+        <p><em>Example:</em> https://tim.zognet.net/apps/coronavirus?since=1/1/2021&rolling=5</p>
         <h5>Data Notes</h5>
         <ul>
         <li>Sources: <a href="https://systems.jhu.edu/research/public-health/ncov/">Johns Hopkins University/Center for Systems Science and Engineering</a>
@@ -89,6 +99,7 @@
 <p class="timestamp">Last updated: <span id="updated"></span></p>
 <p class="timestamp">Case data as of: <span id="newdate"></span></p>
 <p class="timestamp">Vaccine data as of: <span id="newvaxdate"></span></p>
+<p class="timestamp">Total cases/deaths from: <span id="startdate"></span></p>
 </div>
 <div class="col-xs-6">
 <p class="timestamp">Averages are calculated for new cases/deaths/vaccinations over <span class="rolling"></span> days. Trends are calculated for the most recent <span class="trendlen">0</span> days
@@ -233,11 +244,11 @@
                       <th>Average/1,000</th>
 
                       <th>Total</th>
-                      <th>Total/1,000</th>
+                      <th>Total/100K</th>
                       <th>New</th>
-                      <th>New/1,000</th>
+                      <th>New/100K</th>
                       <th>Average</th>
-                      <th>Average/1,000</th>
+                      <th>Average/100K</th>
                   </tr>
               </thead>
               <tbody>
@@ -342,11 +353,11 @@
                       <th>Average/1,000</th>
 
                       <th>Total</th>
-                      <th>Total/1,000</th>
+                      <th>Total/100K</th>
                       <th>New</th>
-                      <th>New/1,000</th>
+                      <th>New/100K</th>
                       <th>Average</th>
-                      <th>Average/1,000</th>
+                      <th>Average/100K</th>
                   </tr>
               </thead>
               <tbody>
@@ -410,11 +421,11 @@
                       <th>Average/1,000</th>
 
                       <th>Total</th>
-                      <th>Total/1,000</th>
+                      <th>Total/100K</th>
                       <th>New</th>
-                      <th>New/1,000</th>
+                      <th>New/100K</th>
                       <th>Average</th>
-                      <th>Average/1,000</th>
+                      <th>Average/100K</th>
                   </tr>
               </thead>
               <tbody>

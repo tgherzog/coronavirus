@@ -158,12 +158,17 @@ function formatCaseValue(value, idx) {
   return formatters.number(value, config[idx].settings.perCapita ? 2 : 0);
 }
 
-function per_capita(value, pop) {
+function per_capita(value, pop, denom) {
 
     if( pop === null || pop == 0 )
         return 0;
 
-    return value / (pop/1000);
+    return value / (pop/pop_denom(denom));
+}
+
+function pop_denom(denom) {
+
+    return denom == 'deaths' ? 100000 : 1000;
 }
 
 function tot(series, n) {
@@ -575,6 +580,7 @@ data = {}
 stateData = {}
 dayOffset = 1;  // offset of data that we actually display - ignoring early dates that are less significant
 baseline = undefined;
+startDate = undefined;
 
 function marginal_value(data, span, n) {
 
@@ -645,7 +651,7 @@ function updateTodayChart() {
             n = cases.length - 1;
             vn = vDist.length - 1;
             if( config[offset].settings.perCapita ) {
-                population = data['states'][key]['population'] / 1000;
+                population = data['states'][key]['population'] / pop_denom(config[offset].settings.type);
             }
             else {
                 population = 1;
@@ -653,12 +659,12 @@ function updateTodayChart() {
 
             switch(config[offset].settings.type) {
                 case 'cases':
-                    obs = cases[n] / population;
+                    obs = tot(cases, n) / population;
                     label = 'Cases' + pc;
                     label2 = label;
                     break;
                 case 'deaths':
-                    obs = deaths[n] / population;
+                    obs = tot(deaths, n) / population;
                     label = 'Deaths' + pc;
                     label2 = label;
                     break;
@@ -769,7 +775,7 @@ function addTimeSeries(offset, key, hidden=false) {
     var seriesType = config[offset].settings.aggregation;
 
     if( config[offset].settings.perCapita ) {
-        population = data[key]['population'] / 1000;
+        population = data[key]['population'] / pop_denom(type);
     }
 
     // here we grab 1 prior value so we can calculate 'new' cases if necessary. Then we start indexing from 1
@@ -885,7 +891,8 @@ function updateTimeSeries(offset) {
         var agg = config[offset].settings.aggregation == 'total' ? 'total' : 'new';
         field = capitalize(agg) + ' ' + capitalize(config[offset].settings.field);
         if( config[offset].settings.perCapita ) {
-            field = field + '/1,000';
+            denom = config[offset].settings.field == 'deaths' ? '100K' : '1,000';
+            field = field + '/' + denom;
         }
     }
 
@@ -968,9 +975,9 @@ function updateState(state, updateMenu) {
                 tot(row.cases, i), per_capita(tot(row.cases, i), pop),
                 new_cases, per_capita(new_cases, pop),
                 avg_cases, per_capita(avg_cases, pop),
-                tot(row.deaths, i), per_capita(tot(row.deaths, i), pop),
-                new_deaths, per_capita(new_deaths, pop),
-                avg_deaths, per_capita(avg_deaths, pop)
+                tot(row.deaths, i), per_capita(tot(row.deaths, i, 'deaths'), pop),
+                new_deaths, per_capita(new_deaths, pop, 'deaths'),
+                avg_deaths, per_capita(avg_deaths, pop, 'deaths')
             ];
             var row_ = $table.row.add(elems).node();
             if( row['admin'] == 1 )
@@ -1021,19 +1028,24 @@ function initialize() {
         if( qs.get('since') ) {
             var d = qs.get('since').split('/');
             if( d.length >= 2 ) {
-                if( d.length == 2 ) d.push('2020');  // hopefully this won't last much longer, otherwise, might want to revisit the 2020 assumption
-                var t = data_.days.indexOf(d.join('/'));
+                if( d.length == 2 ) d.push((new Date()).getFullYear());
+                d = d.join('/');
+                var t = data_.days.indexOf(d);
                 if( t > 0 ) {
                     dayOffset = t;
                     baseline = dayOffset - 1;
+                    startDate = d;
                 }
             }
         }
-        else {
-            // otherwise, the default is to start where the national case load exceeds 25, which is 2/29/2020
+
+        if( baseline == undefined ) {
+            // otherwise, or if an invalid date is specified, the default is to start where the national case load exceeds 25, which is 2/29/2020
             dayOffset = 0;
             while( dayOffset < data['states']['USA']['cases'].length && data['states']['USA']['cases'][dayOffset] < 25 )
                 dayOffset++;
+
+            startDate = data.days[dayOffset];
         }
 
         $('span.trendlen').text(trendLen.toString());
@@ -1043,6 +1055,7 @@ function initialize() {
         $('#updated').text(d.toLocaleString());
         $('#newdate').text(data['most_recent_day']);
         $('#newvaxdate').text(data['most_recent_vaccine_day']);
+        $('#startdate').text(startDate);
 
         var i = 0, case_list = [];
         for(i=0;i<3;i++)
@@ -1074,9 +1087,9 @@ function initialize() {
               tot(cases, n), per_capita(tot(cases, n), pop),
               new_cases, per_capita(new_cases, pop),
               avg_cases, per_capita(avg_cases, pop),
-              tot(deaths, n), per_capita(tot(deaths, n), pop),
-              new_deaths, per_capita(new_deaths, pop),
-              avg_deaths, per_capita(avg_deaths, pop)
+              tot(deaths, n), per_capita(tot(deaths, n), pop, 'deaths'),
+              new_deaths, per_capita(new_deaths, pop, 'deaths'),
+              avg_deaths, per_capita(avg_deaths, pop, 'deaths')
             ]).node();
             if( data['states'][key]['admin'] == 0 )
                 $(row).addClass('aggregate');
