@@ -988,6 +988,14 @@ function updateState(state, updateMenu) {
                 $(row_).addClass('aggregate');
             else
                 case_list.push({code: row.fips, cases: elems[sorter[0]]});
+
+            if( row.cdc ) {
+                if( row.cdc.comm_lev )
+                    $(row_).addClass('comm_level_' + row.cdc.comm_lev.replace('/','').toLowerCase())
+
+                if( row.cdc.trans_lev )
+                    $(row_).addClass('trans_level_' + row.cdc.trans_lev.replace('/','').toLowerCase())
+            }
         }
 
         $table.draw();
@@ -1459,6 +1467,14 @@ $(document).ready(function() {
         $table.draw();
 
         config[offset].chart_.update();
+    });
+
+    $('#local-shade-select').change(function() {
+      var menuItem = $(this).val();
+      $('#county-table').removeClass('table-comm-levels table-trans-levels');
+      if( menuItem != 'none' ) {
+        $('#county-table').addClass('table-' + menuItem);
+      }
     });
 
     $('#state-detail-select').change(function() {

@@ -138,6 +138,41 @@ vaccine_data = pd.read_csv('http://cvapi.zognet.net/v2/USA/vaccines.csv')
 vaccine_data['Date'] = pd.to_datetime(vaccine_data['Date'])
 vaccine_data.set_index(['Date', 'FIPS'], inplace=True)
 
+# load community level data from CDC: this is a bit scrapy, so I'm catching exceptions
+# The feed currently provides both KPI values and classifications for both "community "level"
+# and "community tranmission level" standards, although transmission level seems to be deprecated
+# at the moment. For specifics on classifications, see:
+# https://www.cdc.gov/coronavirus/2019-ncov/science/community-levels.html
+# https://covid.cdc.gov/covid-data-tracker/#county-view (click "How is community transmission calculated?" within the map legend)
+community_data = {}
+try:
+    result = requests.get('https://www.cdc.gov/coronavirus/2019-ncov/modules/science/us_community_burden_by_county.json').json()
+    for row in result['data']:
+        x = {'comm_lev': row['COVID-19 Community Level'], 'trans_lev': row['Community Transmission Level']}
+        try:
+            x['cases'] = float(row['COVID-19 Community Level - Cases per 100k'])
+        except:
+            x['cases'] = None
+
+        try:
+            x['hos_admits'] = float(row['COVID-19 Community Level - COVID Hospital Admissions per 100k'])
+        except:
+            x['hos_admits'] = None
+
+        try:
+            x['bed_usage'] = float(re.search(r'^(.+)%$', row['COVID-19 Community Level - COVID Inpatient Bed Utilization']).group(1))
+        except:
+            x['bed_usage'] = None
+
+        try:
+            x['test_rate'] = float(re.search(r'^(.+)%$', row['Community Transmission Level - Test Positivity']).group(1))
+        except:
+            x['test_rate'] = None
+
+        community_data[row['FIPS']] = x
+except:
+    pass
+
 # there's no data for 1/16-1/18 which makes the charts ugly. Since 1/15 value
 # are identical to 1/19 we just remove them. The rest of the series *should*
 # be complete on a daily basis (but this code doesn't assume that)
@@ -160,12 +195,14 @@ bg2 = get_basic_data('uscty')
 # this seems like a crazy way to get the utc offset but it's the best I could figure out
 utcoffset = datetime.now().astimezone().utcoffset().total_seconds()
 
+build_date = datetime.strftime(datetime.utcnow(), '%Y-%m-%dT%H:%M:%S+0000')
 data = {
-  'build_date': datetime.strftime(datetime.utcnow(), '%Y-%m-%dT%H:%M:%S+0000'),
+  'build_date': build_date,
   'update_date': datetime.strftime(last_modified, '%Y-%m-%dT%H:%M:%S+0000'),
   'update_date_epoch': last_modified.timestamp() + utcoffset,
   'most_recent_day': date_columns_with_century[-1],
   'most_recent_vaccine_day': vaccine_columns[-1],
+  'most_recent_community_data': build_date if community_data else None,
   'days': date_columns_with_century,
   'vaccine_days': vaccine_columns,
   'cases': None,
@@ -285,7 +322,8 @@ for key,row in c2.iterrows():
             fips = v['FIPS']
             admin2 = v['Admin2']
             addr = '{}/{}'.format(admin2, code)
-            state_data['counties'][addr] = case_data(v[date_columns], d.loc[k, date_columns], fips=fips, county=admin2, admin=2, population=safe_cast(bg2['population'].get(fips, None)))
+            state_data['counties'][addr] = case_data(v[date_columns], d.loc[k, date_columns], fips=fips, county=admin2, admin=2,
+                population=safe_cast(bg2['population'].get(fips, None)), cdc=community_data.get(fips, None))
 
         with open(os.path.join(options['TARGET_DIR'], code + '.json'), 'w') as fd:
             json.dump(state_data, fd)

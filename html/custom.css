@@ -9,6 +9,10 @@ h1 span.glyphicon-info-sign {
     font-size: 0.4em;
 }
 
+form span.glyphicon-info-sign {
+    font-size: 0.9em;
+}
+
 .modal-body li {
   margin-bottom: 0.5em;
 }
@@ -189,3 +193,53 @@ tr.aggregate {
   font-weight: bold;
 }
 
+/* defined to match the CDC color scheme */
+span.comm-low,
+table.table-comm-levels tbody tr.comm_level_low {
+  background-color: #00cc99;
+}
+
+span.comm-medium,
+table.table-comm-levels tbody tr.comm_level_medium {
+  background-color: #ffff99;
+}
+
+span.comm-high,
+table.table-comm-levels tbody tr.comm_level_high {
+  background-color: #fc8d59;
+}
+
+span.trans-low,
+table.table-trans-levels tbody tr.trans_level_low {
+  background-color: #1d8aff;
+}
+
+span.trans-medium,
+table.table-trans-levels tbody tr.trans_level_medium {
+  background-color: #fff70e;
+}
+
+span.trans-substantial,
+table.table-trans-levels tbody tr.trans_level_substantial {
+  background-color: #ff71e4;
+}
+
+span.trans-high,
+table.table-trans-levels tbody tr.trans_level_high {
+  background-color: #f00;
+}
+
+table.table-trans-levels tbody tr.trans_level_na,
+table.table-comm-levels tbody tr.comm_level_na {
+  background-color: white;
+}
+
+p.cdc-ratings {
+  text-align: center;
+}
+
+p.cdc-ratings span {
+  display: inline-block;
+  margin: 0 8px;
+  padding: 1px 10px;
+}
