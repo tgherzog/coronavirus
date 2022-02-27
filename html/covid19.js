@@ -643,7 +643,7 @@ function updateTodayChart() {
     var colors = [];
     var offset = 4;
     var label = '';
-    var type2 = config[offset].settings.type == 'new_deaths' ? 'deaths' : config[offset].settings.type;
+    var type2 = (config[offset].settings.type == 'new_deaths' || config[offset].settings.type == 'avg_new_deaths') ? 'deaths' : config[offset].settings.type;
     var pc = config[offset].settings.perCapita ? '/' + pop_denom(type2, true) : '';
     for(var key in data['states']) {
         if( data['states'][key]['admin'] == 1 ) {
