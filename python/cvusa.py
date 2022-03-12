@@ -192,6 +192,12 @@ date_columns_with_century = list(map(add_century, date_columns))
 bg1 = get_basic_data('usstate').reset_index().set_index('name')
 bg2 = get_basic_data('uscty')
 
+# merge community data into county-level basic data, column names prefixed with "cdc_"
+if community_data:
+    cdc = pd.DataFrame(community_data.values(), index=community_data.keys())
+    cdc.columns = cdc.columns.map(lambda x: 'cdc_'+x)
+    bg2 = bg2.join(cdc)
+
 # this seems like a crazy way to get the utc offset but it's the best I could figure out
 utcoffset = datetime.now().astimezone().utcoffset().total_seconds()
 
@@ -203,6 +209,7 @@ data = {
   'most_recent_day': date_columns_with_century[-1],
   'most_recent_vaccine_day': vaccine_columns[-1],
   'most_recent_community_data': build_date if community_data else None,
+  'cdc': {'comm_lev': None, 'trans_lev': None},
   'days': date_columns_with_century,
   'vaccine_days': vaccine_columns,
   'cases': None,
@@ -226,8 +233,14 @@ data['new_cases'] = int(cases[today] - cases[yesterday])
 data['new_deaths'] = int(deaths[today] - deaths[yesterday])
 
 # This is probably not the official national population estimate, but for this purpose it's close enough
+us_pop = int(bg1['population'].sum())
+
+if community_data:
+    data['cdc']['comm_lev'] = np.round(bg2.groupby('cdc_comm_lev').sum()['population'] / us_pop, 4).to_dict()
+    data['cdc']['trans_lev'] = np.round(bg2.groupby('cdc_trans_lev').sum()['population'] / us_pop, 4).to_dict()
+
 data['states']['USA'] = case_data(cases[date_columns], deaths[date_columns], code='USA', fips='00', admin=0,
-  population=int(bg1['population'].sum()),
+  population=us_pop,
   # tests=[None]*len(date_columns),
   # hospitalizations=[None]*len(date_columns),
   vaccines_distributed=[None]*len(vaccine_columns), vaccines_administered=[None]*len(vaccine_columns),
@@ -306,10 +319,12 @@ with open(os.path.join(options['TARGET_DIR'], 'USA.json'), 'w') as fd:
 for key,row in c2.iterrows():
     code = bg1['code'].get(key)
     if code:
+        state_fips = bg1.loc[key, 'id']
         state_data = {
           'state': key,
           'state_abbr': code,
           'most_recent_day': date_columns_with_century[-1],
+          'cdc': {'comm_lev': None, 'trans_lev': None},
           'days': date_columns_with_century,
           'cases': int(row[today]),
           'deaths': int(d2.loc[key, today]),
@@ -317,6 +332,10 @@ for key,row in c2.iterrows():
           'new_deaths': int(d2.loc[key, today] - d2.loc[key, yesterday]),
           'counties': {}
         }
+
+        if community_data:
+            state_data['cdc']['comm_lev'] = np.round(bg2[bg2.index.str.startswith(state_fips)].groupby('cdc_comm_lev').sum()['population'] / bg1.loc[key, 'population'], 4).to_dict()
+            state_data['cdc']['trans_lev'] = np.round(bg2[bg2.index.str.startswith(state_fips)].groupby('cdc_trans_lev').sum()['population'] / bg1.loc[key, 'population'], 4).to_dict()
 
         for k,v in c[c['Province/State']==key].dropna(subset=['Admin2']).iterrows():
             fips = v['FIPS']
