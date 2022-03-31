@@ -78,9 +78,10 @@
 
         <p>The <a href="">Community Transmission Levels</a> measurement is a similar approach in which the ratings formula is based new COVID cases and positive test rates over the
         past 7 days. This appears to be an earlier approach, but the CDC still provides current data on its website. 
-        <p class="cdc-ratings"><span>Levels:</span> <span class="trans-low">Low</span> <span class="trans-medium">Medium</span> <span class="trans-substantial">Substantial</span> <span class="trans-high">High</span></p>
+        <p class="cdc-ratings"><span>Levels:</span> <span class="trans-low">Low</span> <span class="trans-moderate">Moderate</span> <span class="trans-substantial">Substantial</span> <span class="trans-high">High</span></p>
         
-        <p>This website shows the latest levels provided by the CDC. Note that new case data is sourced separately from <a href="https://systems.jhu.edu/research/public-health/ncov/">Johns
+        <p>This website shows the latest levels provided by the CDC. For state and national summaries it shows the percentage of the total population within each level.
+        Note that new case data is sourced separately from <a href="https://systems.jhu.edu/research/public-health/ncov/">Johns
         Hopkins University</a>, so the ratings may not exactly match the data shown.</p>
         <p>For more information on level's definition and suggested measures, check out these CDC links:</p>
         <ul>
@@ -131,8 +132,16 @@
 <p class="timestamp">Total cases/deaths since: <span id="startdate"></span></p>
 </div>
 <div class="col-xs-6">
-<p class="timestamp">Averages are calculated for new cases/deaths/vaccinations over <span class="rolling"></span> days. Trends are calculated for the most recent <span class="trendlen">0</span> days
-(<a data-toggle="modal" href="#trend-info">more info</a>).</p>
+<p class="timestamp">Averages are calculated for new cases/deaths/vaccinations over <span class="rolling"></span> days.
+Trends are calculated for the most recent <span class="trendlen">0</span> days
+(<a data-toggle="modal" href="#trend-info">more info</a>).
+</p>
+</p>
+Show data since:
+  <a href="?">2/29/2020 (earliest)</a> | 
+  <a href="?since=1/1/2021">1/1/2021</a> |
+  <a href="?since=1/1/2022">1/1/2022</a>
+</p>
 </div>
 </div>
 
@@ -165,9 +174,17 @@
 <div class="covid-banner" id="banner-vaccines">
     <table>
     <!-- <tr><td class="name">Doses Distributed:</td><td class="total">123,456</td></tr> -->
-    <tr><td class="name">Doses Administered:</td><td class="admin">1,456</td></tr>
-    <tr><td class="name">Complete Vaccinations:</td><td class="complete">1,456</td></tr>
-    <tr><td class="name">Vaccination Rate:</td><td class="rate">10%</td></tr>
+    <!-- <tr><td class="name">Doses Administered:</td><td class="admin">1,456</td></tr> -->
+    <tr><td class="name">Vaccinations:</td><td class="complete">1,456</td></tr>
+    <tr><td class="name">Vax. Rate:</td><td class="rate">10%</td></tr>
+    <tr><td class="name">Community:<a data-toggle="modal" href="#cdc-info"><span class="glyphicon glyphicon-info-sign" aria-hidden="true"></span></a></td>
+      <td class="cdc comm-level">
+        <span class="low"></span>/<span class="medium"></span>/<span class="high"></span>%
+      </td></tr>
+    <tr><td class="name">Transmission:<a data-toggle="modal" href="#cdc-info"><span class="glyphicon glyphicon-info-sign" aria-hidden="true"></span></a></td>
+      <td class="cdc trans-level">
+        <span class="low"></span>/<span class="moderate"></span>/<span class="substantial"></span>/<span class="high"></span>%
+      </td></tr>
     </table>
 </div>
 </div>
@@ -322,10 +339,18 @@
           <div class="col-xs-10 col-xs-offset-1 col-md-4 col-md-offset-0">
               <div class="covid-banner" id="banner-state-vaccines">
                   <table>
-                  <!-- <tr><td class="name">Doses Distributed:</td><td class="total">123,456</td></tr> -->
-                  <tr><td class="name">Doses Administered:</td><td class="admin">1,456</td></tr>
-                  <tr><td class="name">Complete Vaccinations:</td><td class="complete">1,456</td></tr>
-                  <tr><td class="name">Vaccination Rate:</td><td class="rate">10%</td></tr>
+                    <!-- <tr><td class="name">Doses Distributed:</td><td class="total">123,456</td></tr> -->
+                    <!-- <tr><td class="name">Doses Administered:</td><td class="admin">1,456</td></tr> -->
+                    <tr><td class="name">Vaccinations:</td><td class="complete">1,456</td></tr>
+                    <tr><td class="name">Vax. Rate:</td><td class="rate">10%</td></tr>
+                    <tr><td class="name">Community:<a data-toggle="modal" href="#cdc-info"><span class="glyphicon glyphicon-info-sign" aria-hidden="true"></span></a></td>
+                      <td class="cdc comm-level">
+                        <span class="low"></span>/<span class="medium"></span>/<span class="high"></span>%
+                      </td></tr>
+                    <tr><td class="name">Transmission:<a data-toggle="modal" href="#cdc-info"><span class="glyphicon glyphicon-info-sign" aria-hidden="true"></span></a></td>
+                      <td class="cdc trans-level">
+                        <span class="low"></span>/<span class="moderate"></span>/<span class="substantial"></span>/<span class="high"></span>%
+                      </td></tr>
                   </table>
               </div>
           </div>

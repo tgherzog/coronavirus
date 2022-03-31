@@ -927,6 +927,17 @@ function updateBadges(state, caseID, deathsID, vaccinesID) {
     $(vaccinesID).find('.admin').text(formatters.number(tot(vaccines2, n)));
     $(vaccinesID).find('.complete').text(formatters.number(tot(vaccines3, n)));
     $(vaccinesID).find('.rate').text((vaccines3[n] * 100 / data['states'][state]['population']).toFixed(1) + '%');
+
+    cdc = data['states'][state]['cdc']['comm_lev'];
+    $(vaccinesID).find('.comm-level .low').text(formatters.number((cdc['low'] || 0) * 100));
+    $(vaccinesID).find('.comm-level .medium').text(formatters.number((cdc['medium'] || 0) * 100));
+    $(vaccinesID).find('.comm-level .high').text(formatters.number((cdc['high'] || 0) * 100));
+
+    cdc = data['states'][state]['cdc']['trans_lev'];
+    $(vaccinesID).find('.trans-level .low').text(formatters.number((cdc['low'] || 0) * 100));
+    $(vaccinesID).find('.trans-level .moderate').text(formatters.number((cdc['moderate'] || 0) * 100));
+    $(vaccinesID).find('.trans-level .substantial').text(formatters.number((cdc['substantial'] || 0) * 100));
+    $(vaccinesID).find('.trans-level .high').text(formatters.number((cdc['high'] || 0) * 100));
 }
 
 function tableCheckbox(val, id) {
@@ -949,10 +960,12 @@ function updateState(state, updateMenu) {
     updateBadges(state, '#banner-state-cases', '#banner-state-deaths', '#banner-state-vaccines');
 
     var code = data['states'][state]['code'];
-    var stateRow = data['states'][state];
+    var stateRow = {...data['states'][state]};
+    stateRow['cdc'] = null;
     stateRow['county'] = state;
 
     document.cookie = 'usState=' + state + '; expires=Tue, 31 Dec 2024 00:00 UTC';
+    console.log('Fetching ' + code);
     $.get(apiRoot + code + '.json', function(data) {
         stateData = data;
         
@@ -991,10 +1004,10 @@ function updateState(state, updateMenu) {
 
             if( row.cdc ) {
                 if( row.cdc.comm_lev )
-                    $(row_).addClass('comm_level_' + row.cdc.comm_lev.replace('/','').toLowerCase())
+                    $(row_).addClass('comm_level_' + row.cdc.comm_lev.replace('/',''))
 
                 if( row.cdc.trans_lev )
-                    $(row_).addClass('trans_level_' + row.cdc.trans_lev.replace('/','').toLowerCase())
+                    $(row_).addClass('trans_level_' + row.cdc.trans_lev.replace('/',''))
             }
         }
 

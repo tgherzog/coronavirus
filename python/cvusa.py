@@ -122,7 +122,24 @@ def add_century(x):
 
 def nan_to_none(x):
 
-    return None if np.isnan(x) else x
+    if type(x) is dict:
+        z = {}
+        for k,v in x.items():
+            z[k] = None if v is np.nan else v
+
+        return z
+
+    raise ValueError
+
+    # else, assume an iterable
+    try:
+        z = []
+        for elem in x:
+            z.append(None if elem is np.nan else elem)
+
+        return z
+    except:
+        return None if x is np.nan else x
     
 
 confirmed_url, deaths_url, recovery_url, last_modified = csse_refs('usa')
@@ -137,41 +154,6 @@ d['FIPS'] = d['FIPS'].map(lambda x: '{:05d}'.format(int(np.nan_to_num(x))))
 vaccine_data = pd.read_csv('http://cvapi.zognet.net/v2/USA/vaccines.csv')
 vaccine_data['Date'] = pd.to_datetime(vaccine_data['Date'])
 vaccine_data.set_index(['Date', 'FIPS'], inplace=True)
-
-# load community level data from CDC: this is a bit scrapy, so I'm catching exceptions
-# The feed currently provides both KPI values and classifications for both "community "level"
-# and "community tranmission level" standards, although transmission level seems to be deprecated
-# at the moment. For specifics on classifications, see:
-# https://www.cdc.gov/coronavirus/2019-ncov/science/community-levels.html
-# https://covid.cdc.gov/covid-data-tracker/#county-view (click "How is community transmission calculated?" within the map legend)
-community_data = {}
-try:
-    result = requests.get('https://www.cdc.gov/coronavirus/2019-ncov/modules/science/us_community_burden_by_county.json').json()
-    for row in result['data']:
-        x = {'comm_lev': row['COVID-19 Community Level'], 'trans_lev': row['Community Transmission Level']}
-        try:
-            x['cases'] = float(row['COVID-19 Community Level - Cases per 100k'])
-        except:
-            x['cases'] = None
-
-        try:
-            x['hos_admits'] = float(row['COVID-19 Community Level - COVID Hospital Admissions per 100k'])
-        except:
-            x['hos_admits'] = None
-
-        try:
-            x['bed_usage'] = float(re.search(r'^(.+)%$', row['COVID-19 Community Level - COVID Inpatient Bed Utilization']).group(1))
-        except:
-            x['bed_usage'] = None
-
-        try:
-            x['test_rate'] = float(re.search(r'^(.+)%$', row['Community Transmission Level - Test Positivity']).group(1))
-        except:
-            x['test_rate'] = None
-
-        community_data[row['FIPS']] = x
-except:
-    pass
 
 # there's no data for 1/16-1/18 which makes the charts ugly. Since 1/15 value
 # are identical to 1/19 we just remove them. The rest of the series *should*
@@ -192,11 +174,70 @@ date_columns_with_century = list(map(add_century, date_columns))
 bg1 = get_basic_data('usstate').reset_index().set_index('name')
 bg2 = get_basic_data('uscty')
 
-# merge community data into county-level basic data, column names prefixed with "cdc_"
-if community_data:
-    cdc = pd.DataFrame(community_data.values(), index=community_data.keys())
-    cdc.columns = cdc.columns.map(lambda x: 'cdc_'+x)
-    bg2 = bg2.join(cdc)
+# CDC data is county level, so it's easiest just to add it to bg2
+# set cdc columns to nan by default
+bg2['cases_7d_100k'] = np.nan
+bg2['admits_7d_100k'] = np.nan
+bg2['bed_usage_perc'] = np.nan
+bg2['test_rate_perc'] = np.nan
+bg2['comm_lev'] = np.nan
+bg2['trans_lev'] = np.nan
+
+try:
+    # I scraped this URL from the community levels page - not sure how durable it is
+    result = requests.get('https://www.cdc.gov/coronavirus/2019-ncov/modules/science/us-community-levels-by-county.json').json()
+    for row in result['data']:
+        fips = row['FIPS']
+        if fips not in bg2.index:
+            continue
+
+        bg2.loc[fips, 'comm_lev'] = row.get('COVID-19 Community Level', '').lower()
+        try:
+            bg2.loc[fips, 'cases_7d_100k'] = float(row['COVID-19 Community Level - Cases per 100k'])
+        except:
+            pass
+
+        try:
+            bg2.loc[fips, 'admits_7d_100k'] = float(row['COVID-19 Community Level - COVID Hospital Admissions per 100k'])
+        except:
+            pass
+
+        try:
+            bg2.loc[fips, 'bed_usage_perc'] = float(re.search(r'^(.+)%$', row['COVID-19 Community Level - COVID Inpatient Bed Utilization']).group(1))
+        except:
+            pass
+except:
+    pass
+
+
+# transmission level data comes from a Socrata endpoint with historical data. We sort by report_date and take records with the first encountered
+# date, and stop when we hit a different date. We assume less than 3500 counties
+row_ = {}
+try:
+    report_date = None
+    result = requests.get('https://data.cdc.gov/resource/8396-v7yb.json?$order=report_date+DESC&$limit=3500').json()
+    for row in result:
+        row_ = row
+        if report_date is None:
+            report_date = row['report_date']
+        elif report_date != row['report_date']:
+            break
+
+        fips = row['fips_code']
+        if fips not in bg2.index:
+            continue
+
+        if row.get('community_transmission_level'):
+            bg2.loc[fips, 'trans_lev'] = row['community_transmission_level'].lower()
+        try:
+            bg2.loc[fips, 'test_rate_perc'] = float(row['percent_test_results_reported'])
+        except:
+            pass
+except:
+    pass
+
+# bg1.to_pickle('bg1.pickle')
+# bg2.to_pickle('bg2.pickle')
 
 # this seems like a crazy way to get the utc offset but it's the best I could figure out
 utcoffset = datetime.now().astimezone().utcoffset().total_seconds()
@@ -208,8 +249,6 @@ data = {
   'update_date_epoch': last_modified.timestamp() + utcoffset,
   'most_recent_day': date_columns_with_century[-1],
   'most_recent_vaccine_day': vaccine_columns[-1],
-  'most_recent_community_data': build_date if community_data else None,
-  'cdc': {'comm_lev': None, 'trans_lev': None},
   'days': date_columns_with_century,
   'vaccine_days': vaccine_columns,
   'cases': None,
@@ -235,16 +274,16 @@ data['new_deaths'] = int(deaths[today] - deaths[yesterday])
 # This is probably not the official national population estimate, but for this purpose it's close enough
 us_pop = int(bg1['population'].sum())
 
-if community_data:
-    data['cdc']['comm_lev'] = np.round(bg2.groupby('cdc_comm_lev').sum()['population'] / us_pop, 4).to_dict()
-    data['cdc']['trans_lev'] = np.round(bg2.groupby('cdc_trans_lev').sum()['population'] / us_pop, 4).to_dict()
-
 data['states']['USA'] = case_data(cases[date_columns], deaths[date_columns], code='USA', fips='00', admin=0,
   population=us_pop,
+  cdc={'comm_lev': None, 'trans_lev': None},
   # tests=[None]*len(date_columns),
   # hospitalizations=[None]*len(date_columns),
   vaccines_distributed=[None]*len(vaccine_columns), vaccines_administered=[None]*len(vaccine_columns),
   vaccines_admin1=[None]*len(vaccine_columns), vaccines_complete=[None]*len(vaccine_columns))
+
+data['states']['USA']['cdc']['comm_lev']  = np.round(bg2.groupby('comm_lev').sum()['population'] / us_pop, 4).to_dict()
+data['states']['USA']['cdc']['trans_lev'] = np.round(bg2.groupby('trans_lev').sum()['population'] / us_pop, 4).to_dict()
 
 c2 = c.groupby('Province/State').sum()
 d2 = d.groupby('Province/State').sum()
@@ -255,10 +294,14 @@ for key,row in c2.iterrows():
     if code:
         data['states'][key] = case_data(row[date_columns], d2.loc[key, date_columns], code=code, fips=fips, admin=1,
           population=int(bg1['population'].get(key)),
+          cdc={'comm_lev': None, 'trans_lev': None},
           # tests=[None]*len(date_columns),
           # hospitalizations=[None]*len(date_columns),
           vaccines_distributed=[None]*len(vaccine_columns), vaccines_administered=[None]*len(vaccine_columns),
           vaccines_admin1=[None]*len(vaccine_columns), vaccines_complete=[None]*len(vaccine_columns))
+
+        data['states'][key]['cdc']['comm_lev']  = np.round(bg2[bg2.index.str.startswith(fips)].groupby('comm_lev').sum()['population'] / bg1.loc[key, 'population'], 4).to_dict()
+        data['states'][key]['cdc']['trans_lev'] = np.round(bg2[bg2.index.str.startswith(fips)].groupby('trans_lev').sum()['population'] / bg1.loc[key, 'population'], 4).to_dict()
 
 for key,row in c.sort_values(today, ascending=False).head(50).iterrows():
     fips = row['FIPS']
@@ -314,17 +357,18 @@ for dt in vaccine_data.index.unique(0):
             data['states'][vaccine_keys[k]]['vaccines_complete'][offset] = int(row['Admin_Complete'])
 
 with open(os.path.join(options['TARGET_DIR'], 'USA.json'), 'w') as fd:
-    json.dump(data, fd)
+    json.dump(data, fd, allow_nan=False)
+
+# replace Nan with None so we don't get bogus Nan's in the the json script
+bg2 = bg2.where(pd.notnull(bg2), None)
 
 for key,row in c2.iterrows():
     code = bg1['code'].get(key)
     if code:
-        state_fips = bg1.loc[key, 'id']
         state_data = {
           'state': key,
           'state_abbr': code,
           'most_recent_day': date_columns_with_century[-1],
-          'cdc': {'comm_lev': None, 'trans_lev': None},
           'days': date_columns_with_century,
           'cases': int(row[today]),
           'deaths': int(d2.loc[key, today]),
@@ -333,16 +377,23 @@ for key,row in c2.iterrows():
           'counties': {}
         }
 
-        if community_data:
-            state_data['cdc']['comm_lev'] = np.round(bg2[bg2.index.str.startswith(state_fips)].groupby('cdc_comm_lev').sum()['population'] / bg1.loc[key, 'population'], 4).to_dict()
-            state_data['cdc']['trans_lev'] = np.round(bg2[bg2.index.str.startswith(state_fips)].groupby('cdc_trans_lev').sum()['population'] / bg1.loc[key, 'population'], 4).to_dict()
-
+        cdc_fields = ['cases_7d_100k', 'admits_7d_100k', 'bed_usage_perc', 'test_rate_perc', 'comm_lev', 'trans_lev']
         for k,v in c[c['Province/State']==key].dropna(subset=['Admin2']).iterrows():
             fips = v['FIPS']
             admin2 = v['Admin2']
             addr = '{}/{}'.format(admin2, code)
             state_data['counties'][addr] = case_data(v[date_columns], d.loc[k, date_columns], fips=fips, county=admin2, admin=2,
-                population=safe_cast(bg2['population'].get(fips, None)), cdc=community_data.get(fips, None))
+                population=safe_cast(bg2['population'].get(fips, None)))
+
+            if fips in bg2.index:
+                state_data['counties'][addr]['cdc'] = bg2.loc[fips, cdc_fields].to_dict()
+            else:
+                state_data['counties'][addr]['cdc'] = {}
+                
 
         with open(os.path.join(options['TARGET_DIR'], code + '.json'), 'w') as fd:
-            json.dump(state_data, fd)
+            try:
+                json.dump(state_data, fd, allow_nan=False)
+            except:
+                print('nan found in {}'.format(code))
+                json.dump(state_data, fd)

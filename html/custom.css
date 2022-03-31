@@ -102,7 +102,7 @@ div.covid-banner td:nth-child(2) {
 }
 
 #banner-state-vaccines {
-  background: rgba(44, 191, 84, 0.8);
+  background: rgba(44, 191, 84, 0.6);
 }
 
 h3.summary {
@@ -173,9 +173,21 @@ table.table-cases.check-table th.col-rank, table.table-cases.check-table td:nth-
     width: 33.33333333%;
   }
 
+  /*
   #banner-vaccines td.name, #banner-state-vaccines td.name {
     font-size: 0.8em;
   }
+  */
+  #banner-state-vaccines td,
+  #banner-vaccines td {
+    font-size: 0.9em;
+  }
+
+  /*
+  #banner-vaccines td.complete, #banner-state-vaccines td.complete {
+    font-size: 0.8em;
+  }
+  */
 }
 
 
@@ -194,9 +206,18 @@ tr.aggregate {
 }
 
 /* defined to match the CDC color scheme */
+.covid-banner td.cdc span {
+  display: inline-block;
+  padding: 0 2px;
+}
+
 span.comm-low,
 table.table-comm-levels tbody tr.comm_level_low {
   background-color: #00cc99;
+}
+
+.covid-banner td.comm-level span.low {
+  border-bottom: 3px solid #00cc99;
 }
 
 span.comm-medium,
@@ -204,9 +225,17 @@ table.table-comm-levels tbody tr.comm_level_medium {
   background-color: #ffff99;
 }
 
+.covid-banner td.comm-level span.medium {
+  border-bottom: 3px solid #ffff99;
+}
+
 span.comm-high,
 table.table-comm-levels tbody tr.comm_level_high {
   background-color: #fc8d59;
+}
+
+.covid-banner td.comm-level span.high {
+  border-bottom: 3px solid #fc8d59;
 }
 
 span.trans-low,
@@ -214,9 +243,17 @@ table.table-trans-levels tbody tr.trans_level_low {
   background-color: #1d8aff;
 }
 
-span.trans-medium,
-table.table-trans-levels tbody tr.trans_level_medium {
+.covid-banner td.trans-level span.low {
+  border-bottom: 3px solid #1d8aff;
+}
+
+span.trans-moderate,
+table.table-trans-levels tbody tr.trans_level_moderate {
   background-color: #fff70e;
+}
+
+.covid-banner td.trans-level span.moderate {
+  border-bottom: 3px solid #fff70e;
 }
 
 span.trans-substantial,
@@ -224,9 +261,17 @@ table.table-trans-levels tbody tr.trans_level_substantial {
   background-color: #ff71e4;
 }
 
+.covid-banner td.trans-level span.substantial {
+  border-bottom: 3px solid #ff71e4;
+}
+
 span.trans-high,
 table.table-trans-levels tbody tr.trans_level_high {
   background-color: #f00;
+}
+
+.covid-banner td.trans-level span.high {
+  border-bottom: 3px solid #f00;
 }
 
 table.table-trans-levels tbody tr.trans_level_na,
