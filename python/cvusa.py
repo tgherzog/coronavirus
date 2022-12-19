@@ -9,7 +9,11 @@ http://some.host/all.json  # global data, plus manifest of other countries
 http://some.host/CAN.json  # a specific country
 
 Usage:
-  cvusa.py TARGET_DIR
+  cvusa.py [--extended-cdc-data] TARGET_DIR
+
+Options:
+  --extended-cdc-data           Adds these county-level CDC fields: cases_7d_100k, admits_7d_100k, bed_usage_perc, test_rate_perc
+                                Increasingly these are not reported which produces problematic NaN values in the output files
 
 '''
 
@@ -80,10 +84,10 @@ def get_covid_frame(url, admin2=False):
     df = pd.read_csv(url)
     df.rename(columns={'Province_State': 'Province/State', 'Country_Region': 'Country/Region', 'Long_': 'Long'}, inplace=True)
     if admin2:
-        df['stp_key'] = df['Admin2'].fillna('').str.replace(r'\W','').str.upper()
+        df['stp_key'] = df['Admin2'].fillna('').str.replace(r'\W','', regex=True).str.upper()
         df['geokey'] = df['Province/State'].fillna('_') + ':' + df['Country/Region'].fillna('_') + ':' + df['Admin2'].fillna('_')
     else:
-        df['stp_key'] = df['Province/State'].fillna('').str.replace(r'\W','').str.upper()
+        df['stp_key'] = df['Province/State'].fillna('').str.replace(r'\W','', regex=True).str.upper()
         df['geokey'] = df['Province/State'].fillna('_') + ':' + df['Country/Region'].fillna('_')
 
     df.set_index('geokey', inplace=True)
@@ -183,41 +187,47 @@ bg2['test_rate_perc'] = np.nan
 bg2['comm_lev'] = np.nan
 bg2['trans_lev'] = np.nan
 
+# community level data now comes from a Socrata dataset that includes historicial data. So we sort by report_date
+# and stop processing when we hit a different date
 try:
-    # I scraped this URL from the community levels page - not sure how durable it is
-    result = requests.get('https://www.cdc.gov/coronavirus/2019-ncov/modules/science/us-community-levels-by-county.json').json()
-    for row in result['data']:
-        fips = row['FIPS']
+    report_date = None
+    result = requests.get('https://data.cdc.gov/resource/3nnm-4jni.json?$order=date_updated+DESC&$limit=3500').json()
+    for row in result:
+        if report_date is None:
+            report_date = row['date_updated']
+        elif report_date != row['date_updated']:
+            break
+
+        fips = row['county_fips']
         if fips not in bg2.index:
             continue
 
-        bg2.loc[fips, 'comm_lev'] = row.get('COVID-19 Community Level', '').lower()
+        if row.get('covid_19_community_level'):
+            bg2.loc[fips, 'comm_lev'] = row['covid_19_community_level'].lower()
+
         try:
-            bg2.loc[fips, 'cases_7d_100k'] = float(row['COVID-19 Community Level - Cases per 100k'])
+            bg2.loc[fips, 'cases_7d_100k'] = float(row['covid_cases_per_100k'])
         except:
             pass
 
         try:
-            bg2.loc[fips, 'admits_7d_100k'] = float(row['COVID-19 Community Level - COVID Hospital Admissions per 100k'])
+            bg2.loc[fips, 'admits_7d_100k'] = float(row['covid_hospital_admissions_per_100k'])
         except:
             pass
 
         try:
-            bg2.loc[fips, 'bed_usage_perc'] = float(re.search(r'^(.+)%$', row['COVID-19 Community Level - COVID Inpatient Bed Utilization']).group(1))
+            bg2.loc[fips, 'bed_usage_perc'] = float(row['covid_inpatient_bed_utilization'])
         except:
             pass
 except:
     pass
 
-
 # transmission level data comes from a Socrata endpoint with historical data. We sort by report_date and take records with the first encountered
 # date, and stop when we hit a different date. We assume less than 3500 counties
-row_ = {}
 try:
     report_date = None
     result = requests.get('https://data.cdc.gov/resource/8396-v7yb.json?$order=report_date+DESC&$limit=3500').json()
     for row in result:
-        row_ = row
         if report_date is None:
             report_date = row['report_date']
         elif report_date != row['report_date']:
@@ -229,6 +239,7 @@ try:
 
         if row.get('community_transmission_level'):
             bg2.loc[fips, 'trans_lev'] = row['community_transmission_level'].lower()
+
         try:
             bg2.loc[fips, 'test_rate_perc'] = float(row['percent_test_results_reported'])
         except:
@@ -264,8 +275,8 @@ today = date_columns[-1]
 yesterday = date_columns[-2]
 avg_start = date_columns[-1 - ndays_avg]
 
-cases = c.sum()
-deaths = d.sum()
+cases = c.sum(numeric_only=True)
+deaths = d.sum(numeric_only=True)
 data['cases'] = int(cases[today])
 data['deaths'] = int(deaths[today])
 data['new_cases'] = int(cases[today] - cases[yesterday])
@@ -282,11 +293,11 @@ data['states']['USA'] = case_data(cases[date_columns], deaths[date_columns], cod
   vaccines_distributed=[None]*len(vaccine_columns), vaccines_administered=[None]*len(vaccine_columns),
   vaccines_admin1=[None]*len(vaccine_columns), vaccines_complete=[None]*len(vaccine_columns))
 
-data['states']['USA']['cdc']['comm_lev']  = np.round(bg2.groupby('comm_lev').sum()['population'] / us_pop, 4).to_dict()
-data['states']['USA']['cdc']['trans_lev'] = np.round(bg2.groupby('trans_lev').sum()['population'] / us_pop, 4).to_dict()
+data['states']['USA']['cdc']['comm_lev']  = np.round(bg2.groupby('comm_lev')['population'].sum() / us_pop, 4).to_dict()
+data['states']['USA']['cdc']['trans_lev'] = np.round(bg2.groupby('trans_lev')['population'].sum() / us_pop, 4).to_dict()
 
-c2 = c.groupby('Province/State').sum()
-d2 = d.groupby('Province/State').sum()
+c2 = c.groupby('Province/State').sum(numeric_only=True)
+d2 = d.groupby('Province/State').sum(numeric_only=True)
 
 for key,row in c2.iterrows():
     code = bg1['code'].get(key)
@@ -300,8 +311,8 @@ for key,row in c2.iterrows():
           vaccines_distributed=[None]*len(vaccine_columns), vaccines_administered=[None]*len(vaccine_columns),
           vaccines_admin1=[None]*len(vaccine_columns), vaccines_complete=[None]*len(vaccine_columns))
 
-        data['states'][key]['cdc']['comm_lev']  = np.round(bg2[bg2.index.str.startswith(fips)].groupby('comm_lev').sum()['population'] / bg1.loc[key, 'population'], 4).to_dict()
-        data['states'][key]['cdc']['trans_lev'] = np.round(bg2[bg2.index.str.startswith(fips)].groupby('trans_lev').sum()['population'] / bg1.loc[key, 'population'], 4).to_dict()
+        data['states'][key]['cdc']['comm_lev']  = np.round(bg2[bg2.index.str.startswith(fips)].groupby('comm_lev')['population'].sum() / bg1.loc[key, 'population'], 4).to_dict()
+        data['states'][key]['cdc']['trans_lev'] = np.round(bg2[bg2.index.str.startswith(fips)].groupby('trans_lev')['population'].sum() / bg1.loc[key, 'population'], 4).to_dict()
 
 for key,row in c.sort_values(today, ascending=False).head(50).iterrows():
     fips = row['FIPS']
@@ -377,7 +388,10 @@ for key,row in c2.iterrows():
           'counties': {}
         }
 
-        cdc_fields = ['cases_7d_100k', 'admits_7d_100k', 'bed_usage_perc', 'test_rate_perc', 'comm_lev', 'trans_lev']
+        cdc_fields = ['comm_lev', 'trans_lev']
+        if options['--extended-cdc-data']:
+            cdc_fields = ['cases_7d_100k', 'admits_7d_100k', 'bed_usage_perc', 'test_rate_perc']
+
         for k,v in c[c['Province/State']==key].dropna(subset=['Admin2']).iterrows():
             fips = v['FIPS']
             admin2 = v['Admin2']
