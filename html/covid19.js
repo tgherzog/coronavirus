@@ -445,7 +445,7 @@ config = [
     },
     settings: {
       perCapita: false,
-      type: 'new_cases'
+      type: 'avg_new_cases'
     },
     chart_: null
   },
